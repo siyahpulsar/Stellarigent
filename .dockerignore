@@ -1,0 +1,10 @@
+node_modules
+.git
+.container
+*.log
+logs/
+.env
+config/kurucu.json
+config/config.json
+config/permissions.json
+bin/

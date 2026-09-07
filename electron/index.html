@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Local AI Agent IDE</title>
+  <link rel="stylesheet" href="ide.css">
+</head>
+<body>
+  <div class="ide-container">
+    
+    <div class="main-content">
+      <!-- Left Panel: File Explorer -->
+      <div class="panel left-panel">
+        <div class="panel-header">
+          <span>Explorer</span>
+          <div style="display:flex;gap:4px;">
+            <button id="btn-back-folder" title="Go Back" disabled style="opacity:0.4;font-size:11px;padding:2px 6px;cursor:pointer;">◀</button>
+            <button id="btn-open-folder" title="Open Folder">📁</button>
+          </div>
+        </div>
+        <div id="workspace-label" title="" style="font-size:10px;padding:2px 6px;color:#666;background:#1a1a1a;word-break:break-all;display:none;cursor:default;"></div>
+        <div class="file-tree" id="file-tree">
+          <div class="empty-state">No folder opened. Use File > Open Folder.</div>
+        </div>
+      </div>
+
+      <!-- Middle Panel: Editor -->
+      <div class="panel middle-panel">
+        <div class="panel-header">
+          <span id="editor-title">Editor</span>
+          <button id="btn-save-file" title="Save File (Ctrl+S)">💾</button>
+        </div>
+        <div id="editor-container" style="flex:1; width:100%; height:100%; position:relative;"></div>
+        <textarea id="file-editor" style="display:none;"></textarea> <!-- Hidden fallback for auto-save/tab compatibility -->
+      </div>
+
+
+      <!-- Right Panel: Agent Chat -->
+      <div class="panel right-panel">
+        <div class="panel-header">
+          <span>AI Agent</span>
+          <span id="agent-status" class="status offline">Offline</span>
+        </div>
+        <div class="chat-messages" id="chat-messages">
+          <div class="system-message">Agent ready. Send a task below.</div>
+        </div>
+        
+        <div id="approval-box" class="approval-box hidden">
+          <h4>Action Pending Approval</h4>
+          <p id="pending-action-details"></p>
+          <div class="approval-buttons">
+            <button id="btn-approve-action">Approve</button>
+            <button id="btn-reject-action">Reject</button>
+          </div>
+        </div>
+
+        <form id="chat-form" class="chat-form">
+          <input type="text" id="chat-input" placeholder="Ask agent to do something..." autocomplete="off">
+          <button type="submit">Send</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Bottom Panel: Settings -->
+    <div class="bottom-panel">
+      <div class="settings-header">
+        <span>Settings & Metrics</span>
+        <button id="btn-toggle-settings">▲</button>
+      </div>
+      <div class="settings-content hidden" id="settings-content">
+        <div class="settings-grid">
+          <div class="settings-col">
+            <label>System Prompt Extra:</label>
+            <textarea id="setting-prompt-extra" rows="2" placeholder="Extra instructions for agent..."></textarea>
+            
+            <label>Admin Auth Key:</label>
+            <input type="password" id="setting-auth-key" placeholder="Enter FOUNDER_KEY to connect">
+          </div>
+          <div class="settings-col">
+            <label>Blacklist / Banned Commands:</label>
+            <input type="text" id="setting-blacklist" placeholder="e.g. rm -rf, shutdown">
+            <small>Comma separated list</small>
+          </div>
+          <div class="settings-col">
+            <label>Token Usage:</label>
+            <div id="token-usage">0 tokens</div>
+            <label>Model Preferences:</label>
+            <select id="setting-model">
+              <option value="qwen2.5-coder-7b-instruct">qwen2.5-coder-7b-instruct</option>
+              <option value="meta-llama/Llama-3-8B-Instruct">Llama-3-8B-Instruct</option>
+            </select>
+          </div>
+        </div>
+        <button id="btn-save-settings">Save Settings</button>
+      </div>
+    </div>
+  </div>
+  <script src="ide.js"></script>
+
+  <!-- Ctrl+P File Search Overlay -->
+  <div id="file-search-overlay" class="file-search-overlay hidden">
+    <div class="file-search-modal">
+      <div class="file-search-header">
+        <span>🔍 Open File <kbd>Ctrl+P</kbd></span>
+        <span style="font-size:11px;color:#555;">ESC to close</span>
+      </div>
+      <input type="text" id="file-search-input" placeholder="Type filename to search..." autocomplete="off" spellcheck="false">
+      <div id="file-search-results" class="file-search-results"></div>
+    </div>
+  </div>
+
+  <!-- Monaco Editor Loader -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.38.0/min/vs/loader.min.js"></script>
+  <script>
+    require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.38.0/min/vs' } });
+    require(['vs/editor/editor.main'], function () {
+      window.monacoEditor = monaco.editor.create(document.getElementById('editor-container'), {
+        value: "",
+        language: "javascript",
+        theme: "vs-dark",
+        automaticLayout: true,
+        minimap: { enabled: false }
+      });
+      // Fire event to notify ide.js
+      window.dispatchEvent(new Event('monacoReady'));
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Local AI Computer Agent | Controller</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Google Fonts Outfit & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Outfit:wght@100..900&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo-section">
+        <div class="logo-icon"></div>
+        <h1>Local AI Agent</h1>
+        <span class="logo-tag">LM Studio</span>
+        <span class="logo-tag" id="active-mode-tag">Mode: None</span>
+        <select id="ui-mode-select" class="mode-select">
+          <option value="none">Manual Mode: None</option>
+        </select>
+      </div>
+      <div class="status-indicator">
+        <span class="status-dot idle" id="status-dot"></span>
+        <span class="status-text" id="status-text">Idle</span>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="app-workspace">
+      <!-- Left Column: Navigation & Settings -->
+      <aside class="workspace-sidebar">
+        <div class="sidebar-nav">
+          <div class="accordion-menu" id="modes-accordion">
+            <!-- Manuel Tools -->
+            <div class="accordion-item">
+              <button class="accordion-header" data-mode="manuel">
+                <span class="icon">🛠️</span> Manuel Tools
+              </button>
+              <div class="accordion-content">
+                <button class="sub-nav-btn" data-mode="manuel" data-submode="cmd_tool">CMD/PS Tool</button>
+                <button class="sub-nav-btn" data-mode="manuel" data-submode="app_tool">Application Tool</button>
+                <button class="sub-nav-btn" data-mode="manuel" data-submode="web_search">Web Search Tool</button>
+                <button class="sub-nav-btn" data-mode="manuel" data-submode="file_reader">File Reader Tool</button>
+                <button class="sub-nav-btn" data-mode="manuel" data-submode="file_writer">File Writer Tool</button>
+                <button class="sub-nav-btn" data-mode="manuel" data-submode="dir_lister">Directory Lister Tool</button>
+                <button class="sub-nav-btn" data-mode="manuel" data-submode="task_lister">TaskLister Tool</button>
+                <button class="sub-nav-btn" data-mode="manuel" data-submode="guide_selector">Guide Selector Tool</button>
+                <button class="sub-nav-btn" data-mode="manuel" data-submode="url_image">Url/Image Reader Tool</button>
+                <button class="sub-nav-btn" data-mode="manuel" data-submode="library_mod">Library Mod Tool</button>
+                <button class="sub-nav-btn" data-mode="manuel" data-submode="finance_tool">Finance Tool</button>
+              </div>
+            </div>
+            
+            <!-- Research -->
+            <div class="accordion-item">
+              <button class="accordion-header" data-mode="research">
+                <span class="icon">🔍</span> Research
+              </button>
+              <div class="accordion-content">
+                <button class="sub-nav-btn" data-mode="research" data-submode="web">Web</button>
+                <button class="sub-nav-btn" data-mode="research" data-submode="local">Local</button>
+                <button class="sub-nav-btn" data-mode="research" data-submode="deep_web">Deep Web Search</button>
+              </div>
+            </div>
+
+            <!-- Library -->
+            <div class="accordion-item">
+              <button class="accordion-header" data-mode="library" id="library-accordion-header">
+                <span class="icon">📚</span> Library
+              </button>
+              <div class="accordion-content">
+                <div class="setting-item" style="padding: 10px; border-bottom: 1px solid #333;">
+                  <label class="setting-label" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                    <span style="font-size: 0.85em; color: #ccc;">SGM Modu (Sıralı Görev Modu)</span>
+                    <input type="checkbox" id="library-setting-sgm" checked>
+                  </label>
+                  <label class="setting-label" style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 0.85em; color: #ccc;">Eş Yabancı Modu</span>
+                    <input type="checkbox" id="library-setting-esyabanci" checked>
+                  </label>
+                </div>
+                <div id="library-accordion-content">
+                  <!-- Dynamically populated from backend -->
+                  <div style="padding: 10px; font-size: 0.85em; color: #888;">Yükleniyor...</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Agent Runner -->
+            <div class="accordion-item">
+              <button class="accordion-header" data-mode="agent_runner">
+                <span class="icon">🏃</span> Agent Runner
+              </button>
+              <div class="accordion-content">
+                <div style="padding: 10px; font-size: 0.85em; color: #aaa;">Görev JSON'unu veya düz metni sohbete girin.</div>
+              </div>
+            </div>
+          </div>
+
+          <hr class="nav-divider">
+
+          <button class="nav-btn active" data-tab="chat">
+            <span class="icon">💬</span> Chat View
+          </button>
+          <button class="nav-btn" data-tab="terminal">
+            <span class="icon">💻</span> Live Terminal
+          </button>
+          <button class="nav-btn" data-tab="settings">
+            <span class="icon">⚙️</span> Settings
+          </button>
+          <button class="nav-btn" data-tab="discord">
+            <span class="icon">🤖</span> Discord Bot
+          </button>
+          <button class="nav-btn" data-tab="admin">
+            <span class="icon">👑</span> Admin
+          </button>
+          <button class="nav-btn" data-tab="help">
+            <span class="icon">❓</span> Docs
+          </button>
+          <button class="nav-btn" id="btn-open-ide" style="margin-top: 10px; background: rgba(30,144,255,0.2); border: 1px solid rgba(30,144,255,0.5);">
+            <span class="icon">🖥️</span> Open IDE App
+          </button>
+        </div>
+
+        <!-- Working Directory Card -->
+        <div class="sidebar-card directory-card">
+          <h3>Working Directory</h3>
+          <div class="cwd-display" id="cwd-display">d:\ai\aiAgentLocal</div>
+          <div class="cwd-change-row">
+            <input type="text" id="cwd-input" placeholder="Change path...">
+            <button id="cwd-btn">Update</button>
+          </div>
+        </div>
+
+        <!-- Task Execution Plan Checklist -->
+        <div class="sidebar-card plan-card hidden" id="plan-card">
+          <h3>Task Execution Plan</h3>
+          <div class="plan-steps" id="plan-steps">
+            <!-- Steps dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Sandbox File Changes -->
+        <div class="sidebar-card sandbox-card hidden" id="sandbox-card">
+          <h3>📦 Bekleyen Dosya Değişiklikleri</h3>
+          <div class="sandbox-files" id="sandbox-files">
+            <!-- Files dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Quick Statistics -->
+        <div class="sidebar-card stats-card">
+          <h3>Session Metrics</h3>
+          <div class="stat-row">
+            <span>Tokens Exchanged</span>
+            <span id="stat-tokens">0</span>
+          </div>
+          <div class="stat-row">
+            <span>Actions Allowed</span>
+            <span id="stat-actions">0</span>
+          </div>
+          <div class="stat-row">
+            <span>Safety Blocks</span>
+            <span id="stat-blocks">0</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center & Right Panel: Core Tab View -->
+      <section class="workspace-main">
+        
+        <!-- Tab 1: Chat Dashboard -->
+        <div class="tab-panel active" id="panel-chat">
+          <div class="chat-layout">
+            <!-- Messages Log -->
+            <div class="chat-messages" id="chat-messages">
+              <div class="system-welcome">
+                <h2>Welcome to LM Studio Local AI Agent!</h2>
+                <p>Ensure your LM Studio Local Server is turned <strong>ON</strong> and a model is loaded. Type a task below to let the agent perform local operations.</p>
+                <div class="examples-grid">
+                  <button class="example-btn">"Open notepad and write a python script"</button>
+                  <button class="example-btn">"Search Google/DuckDuckGo for latest Node.js news"</button>
+                  <button class="example-btn">"List files in the current folder and check size"</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Staged User Action Approval Drawer -->
+            <div class="approval-drawer hidden" id="approval-drawer">
+              <div class="approval-header">
+                <div class="approval-badge-row">
+                  <span class="badge-icon">⚠️</span>
+                  <span class="badge-title">AI Action Pending Approval</span>
+                  <span class="badge-risk-level low" id="risk-level">Low Risk</span>
+                </div>
+                <div class="risk-explanation" id="risk-explanation">Modifying directory structure</div>
+              </div>
+              <div class="approval-body">
+                <div class="action-type-row">
+                  <strong>Action:</strong> <span id="action-name">execute_command</span>
+                </div>
+                <div class="action-details-card">
+                  <div class="ai-rationale">
+                    <strong>AI's Explanation:</strong>
+                    <p id="action-rationale">I need to install packages in order to resolve the module imports.</p>
+                  </div>
+                  <div class="action-arguments-section">
+                    <strong>Proposed Command / Arguments:</strong>
+                    <textarea class="action-input-editor" id="action-arguments" rows="3"></textarea>
+                  </div>
+                </div>
+              </div>
+              <div class="approval-footer">
+                <div class="rejection-feedback-row" style="width: 100%; margin-bottom: 12px;">
+                  <input type="text" id="rejection-feedback" placeholder="Provide feedback if rejecting (optional)...">
+                </div>
+                <div class="approval-buttons" style="width: 100%;">
+                  <button class="btn btn-approve" id="btn-approve">Approve Action</button>
+                  <button class="btn btn-reject" id="btn-reject">Reject Action</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Active Thinking Bar / Abort task -->
+            <div class="thinking-indicator-row hidden" id="thinking-row">
+              <div class="thinking-loader">
+                <span class="loader-dot"></span>
+                <span class="loader-dot"></span>
+                <span class="loader-dot"></span>
+              </div>
+              <span class="thinking-txt">Agent is working...</span>
+              <button class="btn btn-abort" id="btn-abort">Abort Task</button>
+            </div>
+
+
+            <!-- Manual AI Bridge Panel (shown when LM Studio is unreachable) -->
+            <div class="manual-bridge-panel hidden" id="manual-bridge-panel">
+              <div class="bridge-header">
+                <span class="bridge-icon">🌉</span>
+                <span class="bridge-title">Manuel AI Köprüsü (LM Studio Bağlanamadı)</span>
+                <span class="bridge-subtitle">Adım bazlı proxy modu</span>
+              </div>
+              <div class="bridge-step">
+                <div class="bridge-step-num">1</div>
+                <div class="bridge-step-content">
+                  <div class="bridge-step-label">Aşağıdaki promptu kopyala</div>
+                  <div class="bridge-step-desc">Agent'ın bu adım için oluşturduğu tam prompt (sistem talimatları + konuşma geçmişi). Kopyalayıp favori AI asistanına gönder.</div>
+                  <textarea class="bridge-prompt-box" id="bridge-prompt-box" readonly placeholder="Prompt yükleniyor..."></textarea>
+                  <button class="btn-bridge-copy" id="btn-bridge-copy">📋 Promptu Kopyala</button>
+                </div>
+              </div>
+              <div class="bridge-step">
+                <div class="bridge-step-num">2</div>
+                <div class="bridge-step-content">
+                  <div class="bridge-step-label">Harici AI platformuna git ve promptu yapıştır</div>
+                  <div class="bridge-step-desc">Aşağıdaki platformlardan birine git. Promptu yeni bir sohbete yapıştır ve gönder.</div>
+                  <div class="bridge-ai-links">
+                    <a class="bridge-ai-link gemini" href="https://gemini.google.com" target="_blank" rel="noopener">✨ Gemini</a>
+                    <a class="bridge-ai-link claude" href="https://claude.ai" target="_blank" rel="noopener">🧠 Claude</a>
+                    <a class="bridge-ai-link chatgpt" href="https://chat.openai.com" target="_blank" rel="noopener">💬 ChatGPT</a>
+                    <a class="bridge-ai-link perplexity" href="https://www.perplexity.ai" target="_blank" rel="noopener">🔍 Perplexity</a>
+                  </div>
+                </div>
+              </div>
+              <div class="bridge-divider"></div>
+              <div class="bridge-step">
+                <div class="bridge-step-num">3</div>
+                <div class="bridge-step-content">
+                  <div class="bridge-step-label">AI'nin cevabını buraya yapıştır ve gönder</div>
+                  <div class="bridge-step-desc">AI platformundan aldığın yanıtı aşağıya yapıştır. Agent kaldığı yerden devam edecek.</div>
+                  <textarea class="bridge-response-box" id="bridge-response-box" placeholder="AI'nin cevabını buraya yapıştır..."></textarea>
+                  <div class="bridge-warning-note">⚠️ <strong>İpucu:</strong> AI'dan gelen cevabı olduğu gibi yapıştır; JSON veya tool call formatını değiştirme.</div>
+                  <button class="btn-bridge-send" id="btn-bridge-send">✅ Cevabı Agent'a Gönder</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Chat Entry Form -->
+            <form class="chat-form" id="chat-form">
+              <button type="button" class="btn btn-clear-chat" id="btn-clear-chat" title="Clear Chat history and reset agent">Reset</button>
+              <div class="chat-input-container" style="position: relative; flex: 1; display: flex;">
+                <button type="button" id="btn-toggle-tts" class="btn" title="Toggle Text-to-Speech" style="margin-right: 5px; font-size: 1.2rem; background: transparent; border: none; cursor: pointer;">🔊</button>
+                <button type="button" id="btn-voice-command" class="btn" title="Hold to speak (STT)" style="margin-right: 5px; font-size: 1.2rem; background: transparent; border: none; cursor: pointer;">🎙️</button>
+                <input type="text" id="chat-input" placeholder="Describe the task you want the local AI agent to perform..." autocomplete="off" style="width: 100%;">
+                <div class="mention-popup hidden" id="mention-popup"></div>
+              </div>
+              <button type="submit" class="btn btn-send" id="btn-send">Send</button>
+            </form>
+          </div>
+          </div>
+
+          <!-- Deep Web Search Panel (Right Side Drawer) -->
+          <div class="deep-research-panel hidden" id="deep-research-panel">
+            <div class="dr-header">
+              <span class="dr-icon">🌐</span>
+              <h3>Deep Research</h3>
+              <button class="btn-close-dr" id="btn-close-dr">&times;</button>
+            </div>
+            <div class="dr-body">
+              <div class="dr-settings">
+                <label for="dr-page-slider">Analiz Edilecek Sayfa Sayısı: <span id="dr-page-count-display">20</span></label>
+                <input type="range" id="dr-page-slider" min="2" max="100" value="20" class="dr-slider">
+              </div>
+              <div class="dr-progress-container">
+                <h4>Canlı İlerleme Durumu</h4>
+                <div class="dr-stat-row">
+                  <span>Adım:</span>
+                  <span id="dr-step-display" class="dr-highlight">Bekleniyor...</span>
+                </div>
+                <div class="dr-stat-row">
+                  <span>Taranan URL:</span>
+                  <span id="dr-url-display" class="dr-text-muted">-</span>
+                </div>
+                <div class="dr-summary-box">
+                  <strong>En Son Özet:</strong>
+                  <p id="dr-summary-display">Henüz özet yok.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Agent Runner Panel (Right Side Drawer) -->
+          <div class="deep-research-panel hidden" id="agent-runner-panel">
+            <div class="dr-header">
+              <span class="dr-icon">🏃</span>
+              <h3>Agent Runner Settings</h3>
+            </div>
+            <div class="dr-body">
+              <div class="settings-card" style="margin-top: 0; padding: 10px; background: transparent; border: none; box-shadow: none;">
+                <div class="setting-item-toggle">
+                  <label class="switch-container">
+                    <input type="checkbox" id="runner-setting-lpm">
+                    <span class="switch-slider"></span>
+                    <span class="switch-label">LPM Modu</span>
+                  </label>
+                </div>
+                <div class="setting-item-toggle" style="margin-top: 10px; margin-left: 10px;">
+                  <label class="switch-container">
+                    <input type="checkbox" id="runner-setting-lpm-om">
+                    <span class="switch-slider"></span>
+                    <span class="switch-label">LPM OM (Odak) Modu</span>
+                  </label>
+                </div>
+                <div class="input-group" style="margin-top: 15px; margin-left: 10px;">
+                  <label for="runner-setting-lpm-batch" style="margin-bottom: 5px; font-size: 0.85em;">LPM Batch Size</label>
+                  <div style="display: flex; align-items: center;">
+                    <input type="range" id="runner-setting-lpm-batch" min="1" max="18" value="1" oninput="document.getElementById('runner-lpm-batch-val').innerText = this.value" style="flex: 1;">
+                    <span id="runner-lpm-batch-val" style="font-weight: bold; margin-left: 10px; width: 25px; text-align: center;">1</span>
+                  </div>
+                </div>
+                
+                <hr style="margin: 15px 0; border: 0; border-top: 1px solid var(--border-color);">
+                
+                <div class="setting-item-toggle">
+                  <label class="switch-container">
+                    <input type="checkbox" id="runner-setting-forceplan">
+                    <span class="switch-slider"></span>
+                    <span class="switch-label">Force Task Plan</span>
+                  </label>
+                </div>
+                
+                <hr style="margin: 15px 0; border: 0; border-top: 1px solid var(--border-color);">
+                
+                <div class="setting-item-toggle">
+                  <label class="switch-container">
+                    <input type="checkbox" id="runner-setting-simba">
+                    <span class="switch-slider"></span>
+                    <span class="switch-label">SiMBA Modu</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Live Terminal Log View -->
+        <div class="tab-panel" id="panel-terminal">
+          <div class="terminal-layout">
+            <div class="terminal-header">
+              <div class="terminal-title">💻 Local Console Output Stream</div>
+              <div class="terminal-controls">
+                <button id="btn-clear-terminal">🗑️ Clear Terminal</button>
+                <button id="btn-interrupt" style="background-color: var(--danger-color); color: white;">🛑 Interrupt / Add Prompt</button>
+              </div>
+            </div>
+            <pre class="terminal-body" id="terminal-body">> Console initialized. Ready to execute commands...</pre>
+          </div>
+          <div class="screenshots-section">
+            <h3>📸 Desktop Screen Captures</h3>
+            <div class="screenshots-grid" id="screenshots-grid">
+              <p class="no-screenshots">No screenshots captured during this session yet.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 3: Configuration & Banned Commands -->
+        <div class="tab-panel" id="panel-settings">
+          <div class="settings-layout">
+            <h2>Safety & Connections Settings</h2>
+            
+            <div class="settings-grid">
+              <!-- Obsidian Library Guide Manager & Editor -->
+              <div class="settings-card guide-editor-card">
+                <h3>Obsidian Library Guide Manager & Editor</h3>
+                <p class="whitelist-info">Select a guide to load and edit, or write a new custom guide below.</p>
+                <div class="input-group">
+                  <label for="editor-guide-select">Select Guide to Edit</label>
+                  <select id="editor-guide-select" class="theme-select">
+                    <option value="">-- Create New Guide --</option>
+                  </select>
+                </div>
+                <div class="input-group">
+                  <label for="editor-guide-name">Guide Filename</label>
+                  <input type="text" id="editor-guide-name" placeholder="custom_guide.md">
+                </div>
+                <div class="input-group">
+                  <label for="editor-guide-content">Guide Instructions (Markdown)</label>
+                  <textarea id="editor-guide-content" class="guide-textarea" rows="5" placeholder="# Custom Instructions Guide..."></textarea>
+                </div>
+                <div class="guide-editor-actions">
+                  <button type="button" class="btn btn-save-guide" id="btn-save-guide">Save Guide File</button>
+                </div>
+              </div>
+
+              <!-- LM Studio Connection -->
+              <div class="settings-card">
+                <h3>Local AI Endpoint (LM Studio)</h3>
+                <div class="input-group">
+                  <label for="setting-url">LM Studio Server URL</label>
+                  <input type="text" id="setting-url" value="http://127.0.0.1:1234/v1">
+                </div>
+                <div class="input-group">
+                  <label for="setting-model">Model Name Override</label>
+                  <input type="text" id="setting-model" value="qwen2.5-coder-7b-instruct">
+                  <small>Leave as default or set to match loaded model ID.</small>
+                </div>
+                <div class="settings-row">
+                  <div class="input-group">
+                    <label for="setting-temp">Temperature</label>
+                    <input type="number" id="setting-temp" min="0" max="1" step="0.1" value="0.2">
+                  </div>
+                  <div class="input-group">
+                    <label for="setting-steps">Max Steps limit</label>
+                    <input type="number" id="setting-steps" min="1" max="50" value="15">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Fallback API Providers -->
+              <div class="settings-card">
+                <h3>Fallback API Providers (Cloud LLMs)</h3>
+                <p class="whitelist-info">If LM Studio fails, the agent will try these APIs in order. (Format: Bearer/API Key)</p>
+                <div class="input-group">
+                  <label for="setting-api-openai">1. OpenAI API Key</label>
+                  <input type="password" id="setting-api-openai" placeholder="sk-proj-...">
+                </div>
+                <div class="input-group">
+                  <label for="setting-api-anthropic">2. Anthropic API Key</label>
+                  <input type="password" id="setting-api-anthropic" placeholder="sk-ant-...">
+                </div>
+                <div class="input-group">
+                  <label for="setting-api-gemini">3. Google Gemini API Key</label>
+                  <input type="password" id="setting-api-gemini" placeholder="AIzaSy...">
+                </div>
+                <div class="input-group">
+                  <label for="setting-api-groq">4. Groq API Key</label>
+                  <input type="password" id="setting-api-groq" placeholder="gsk_...">
+                </div>
+                <small style="color:var(--text-muted);">The fallback priority is: OpenAI -> Anthropic -> Gemini -> Groq. Leave blank to skip.</small>
+              </div>
+
+              <!-- Safety / System Prompt -->
+              <div class="settings-card">
+                <h3>System Prompt Settings</h3>
+                <div class="input-group">
+                  <label for="setting-prompt">Custom Instructions</label>
+                  <textarea id="setting-prompt" rows="4"></textarea>
+                </div>
+              </div>
+
+              <!-- LPM (Low Parameter Mode) Settings -->
+              <div class="settings-card">
+                <h3>Low Parameter Mode (LPM) Settings</h3>
+                <div class="setting-item-toggle">
+                  <label class="switch-container">
+                    <input type="checkbox" id="setting-lpm">
+                    <span class="switch-slider"></span>
+                    <span class="switch-label">Enable LPM (Low Parameter Mode)</span>
+                  </label>
+                </div>
+                <div class="setting-item-toggle" id="lpm-om-container" style="display:none; margin-top: 10px; margin-left: 20px;">
+                  <label class="switch-container">
+                    <input type="checkbox" id="setting-lpm-om">
+                    <span class="switch-slider"></span>
+                    <span class="switch-label">Enable LPM OM (Odaklanma Modu)</span>
+                  </label>
+                </div>
+                <div class="input-group" id="lpm-batch-container" style="display:none; margin-top: 15px; margin-left: 20px;">
+                  <label for="setting-lpm-batch" style="margin-bottom: 5px;">LPM Batch Size (Tools per query)</label>
+                  <div style="display: flex; align-items: center;">
+                    <input type="range" id="setting-lpm-batch" min="1" max="18" value="1" oninput="document.getElementById('lpm-batch-val').innerText = this.value" style="flex: 1;">
+                    <span id="lpm-batch-val" style="font-weight: bold; margin-left: 10px; width: 25px; text-align: center;">1</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Swarm & Whitelist Settings -->
+              <div class="settings-card">
+                <h3>Swarm & Auto-Approval Settings</h3>
+                <div class="setting-item-toggle">
+                  <label class="switch-container">
+                    <input type="checkbox" id="setting-swarm">
+                    <span class="switch-slider"></span>
+                    <span class="switch-label">Enable Swarm Mode (Multi-Agent Team)</span>
+                  </label>
+                </div>
+                <div class="whitelist-group">
+                  <h4>Granular Auto-Approvals</h4>
+                  <p class="whitelist-info">Select low-risk actions to auto-approve without waiting for manual confirmation.</p>
+                  <div class="checkbox-list">
+                    <label class="checkbox-container">
+                      <input type="checkbox" id="approve-read_file">
+                      <span class="checkbox-label">Read File (`read_file`)</span>
+                    </label>
+                    <label class="checkbox-container">
+                      <input type="checkbox" id="approve-write_file">
+                      <span class="checkbox-label">Write/Edit File (`write_file`)</span>
+                    </label>
+                    <label class="checkbox-container">
+                      <input type="checkbox" id="approve-list_directory">
+                      <span class="checkbox-label">List Directory (`list_directory`)</span>
+                    </label>
+                    <label class="checkbox-container">
+                      <input type="checkbox" id="approve-web_search">
+                      <span class="checkbox-label">Web Search (`web_search`)</span>
+                    </label>
+                    <label class="checkbox-container">
+                      <input type="checkbox" id="approve-view_website">
+                      <span class="checkbox-label">View Website (`view_website`)</span>
+                    </label>
+                    <label class="checkbox-container">
+                      <input type="checkbox" id="approve-open_application">
+                      <span class="checkbox-label">Open GUI App (`open_application`)</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Banned Commands List -->
+            <div class="settings-card banned-card">
+              <h3>Banned Shell Commands Blacklist</h3>
+              <p>Commands containing these exact phrases or expressions will be blocked automatically by the backend before reaching the approval dialog.</p>
+              <div class="banned-badges" id="banned-badges">
+                <!-- Badges dynamically rendered here -->
+              </div>
+              <div class="add-banned-row">
+                <input type="text" id="new-banned-input" placeholder="e.g. rm -rf">
+                <button class="btn btn-add-banned" id="btn-add-banned">Add Blacklist Item</button>
+              </div>
+            </div>
+
+            <div class="settings-actions">
+              <button class="btn btn-save" id="btn-save-settings">Save & Apply Settings</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 3.5: Discord Bot Settings -->
+        <div class="tab-panel" id="panel-discord">
+          <div class="settings-layout">
+            <h2>Discord Bot Management</h2>
+            
+            <div class="settings-grid">
+              <!-- Bot General Settings -->
+              <div class="settings-card">
+                <h3>Bot Configuration</h3>
+                <div class="settings-row">
+                  <div class="input-group">
+                    <label for="discord-status">Bot Status</label>
+                    <div class="bot-status-container" style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
+                      <span class="status-dot offline" id="discord-bot-status-dot" style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 8px #ef4444;"></span>
+                      <span id="discord-bot-status-text" style="font-weight: 500; color: #ef4444;">Offline</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="input-group" style="margin-top: 15px;">
+                  <label for="discord-speed-limit">Connection Speed Limit (MB/s)</label>
+                  <input type="number" id="discord-speed-limit" min="0.1" max="100" step="0.1" value="0.7">
+                </div>
+                <div class="settings-actions" style="margin-top: 20px;">
+                  <button class="btn btn-save" id="btn-save-discord-config" style="width: 100%;">Save Bot Configuration</button>
+                </div>
+              </div>
+
+              <!-- Admins Management -->
+              <div class="settings-card">
+                <h3>Bot Admins</h3>
+                <p class="whitelist-info">Users with full access to library management and high-privilege commands.</p>
+                <div class="banned-badges" id="discord-admins-list" style="margin-bottom: 15px;">
+                  <!-- Admins will be dynamically populated -->
+                </div>
+                <div class="add-banned-row">
+                  <input type="text" id="new-discord-admin-input" placeholder="e.g. 123456789012345678">
+                  <button class="btn btn-add-banned" id="btn-add-discord-admin">Add Admin</button>
+                </div>
+              </div>
+
+              <!-- Authorized Music Users -->
+              <div class="settings-card">
+                <h3>Authorized Music Users</h3>
+                <p class="whitelist-info">Users who have permission to join and play music from the library.</p>
+                <div class="banned-badges" id="discord-users-list" style="margin-bottom: 15px;">
+                  <!-- Users will be dynamically populated -->
+                </div>
+                <div class="add-banned-row">
+                  <input type="text" id="new-discord-user-input" placeholder="e.g. 123456789012345678 or <@123456789012345678>">
+                  <button class="btn btn-add-banned" id="btn-add-discord-user">Add User</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 3.9: Admin Panel -->
+        <div class="tab-panel" id="panel-admin">
+          <div class="settings-layout">
+            <h2>Sistem Yönetim Paneli (Admin Control Panel)</h2>
+            
+            <div class="settings-grid">
+              <!-- System Metrics (CPU / RAM) -->
+              <div class="settings-card">
+                <h3>Sistem Kaynakları (Canlı)</h3>
+                <div class="stat-row">
+                  <span>CPU Kullanımı</span>
+                  <span id="admin-sys-cpu" style="font-weight: bold; color: var(--accent-color);">0%</span>
+                </div>
+                <div class="stat-row">
+                  <span>RAM Kullanımı</span>
+                  <span id="admin-sys-ram" style="font-weight: bold; color: var(--accent-color);">0%</span>
+                </div>
+                <div class="stat-row">
+                  <span>RAM (Kullanılan / Toplam)</span>
+                  <span id="admin-sys-ram-mb">0 MB / 0 MB</span>
+                </div>
+              </div>
+              <!-- Card 1: Environment Variables (.env) -->
+              <div class="settings-card">
+                <h3>Çevre Değişkenleri (.env)</h3>
+                <div class="input-group">
+                  <label for="admin-env-port">Web Sunucu Portu (PORT)</label>
+                  <input type="text" id="admin-env-port" placeholder="3000">
+                </div>
+                <div class="input-group">
+                  <label for="admin-env-founderkey">Yönetici Giriş Şifresi (FOUNDER_KEY)</label>
+                  <input type="password" id="admin-env-founderkey" placeholder="Giriş şifrenizi girin">
+                </div>
+                <div class="input-group">
+                  <label for="admin-env-token">Discord Bot Token (DISCORD_TOKEN)</label>
+                  <input type="password" id="admin-env-token" placeholder="Discord Token">
+                </div>
+                <div class="input-group">
+                  <label for="admin-env-founderid">Kurucu Discord ID (FOUNDER_DISCORD_ID)</label>
+                  <input type="text" id="admin-env-founderid" placeholder="Discord User ID">
+                </div>
+                <button class="btn btn-save" id="btn-save-env" style="width: 100%; margin-top: 10px;">Çevre Değişkenlerini Kaydet</button>
+              </div>
+
+              <!-- Card 2: Security Rules (security_rules.json) -->
+              <div class="settings-card">
+                <h3>Güvenlik Filtreleri & Yasaklılar</h3>
+                <div class="input-group">
+                  <label for="admin-security-folders">İzin Verilen Temel Klasörler (Virgülle ayırın)</label>
+                  <textarea id="admin-security-folders" rows="3" placeholder="library, ObsiLibrary, config, scratch"></textarea>
+                </div>
+                <div class="input-group">
+                  <label for="admin-security-words">Yasaklı Kelimeler (Virgülle ayırın)</label>
+                  <textarea id="admin-security-words" rows="5" placeholder="format, shutdown, küfür, vb."></textarea>
+                </div>
+                <div class="input-group">
+                  <label for="admin-security-websites">Yasaklı Web Siteleri (Virgülle ayırın)</label>
+                  <textarea id="admin-security-websites" rows="3" placeholder="pornhub.com, xvideos.com, vb."></textarea>
+                </div>
+                <button class="btn btn-save" id="btn-save-security" style="width: 100%; margin-top: 10px;">Güvenlik Kurallarını Kaydet</button>
+              </div>
+
+              <!-- Card 3: Discord Bot Authorized IDs (permissions.json, kurucu.json, config.json) -->
+              <div class="settings-card">
+                <h3>Discord Yetkili Kullanıcıları</h3>
+                <div class="input-group">
+                  <label for="admin-discord-founder">Kurucu Discord ID (kurucu.json)</label>
+                  <input type="text" id="admin-discord-founder" placeholder="Kurucu ID">
+                </div>
+                <div class="input-group">
+                  <label for="admin-discord-admins">Bot Adminleri (config.json - Virgülle ayırın)</label>
+                  <textarea id="admin-discord-admins" rows="3" placeholder="Admin Discord ID'leri"></textarea>
+                </div>
+                <div class="input-group">
+                  <label for="admin-discord-users">Müzik Yetkilileri (permissions.json - Virgülle ayırın)</label>
+                  <textarea id="admin-discord-users" rows="3" placeholder="Kullanıcı ID'leri veya Etiketleri (<@id>)"></textarea>
+                </div>
+                <div class="input-group">
+                  <label for="admin-discord-speed">Dosya/Müzik İndirme Hız Sınırı (MB/s)</label>
+                  <input type="number" id="admin-discord-speed" min="0.1" max="100" step="0.1" value="0.7">
+                </div>
+                <button class="btn btn-save" id="btn-save-discord-perms" style="width: 100%; margin-top: 10px;">Discord Yetkilerini Kaydet</button>
+              </div>
+
+              <!-- Card 4: Memory Manager (memory.json) -->
+              <div class="settings-card">
+                <h3>Bellek & Hafıza Geçmişi</h3>
+                <p class="whitelist-info" style="margin-bottom: 10px;">Ajanın geçmişte yaptığı görevlerin bellek listesi. Varsa TF-IDF benzerliği ile otomatik hatırlanır.</p>
+                <div class="admin-memory-list" id="admin-memory-list" style="max-height: 250px; overflow-y: auto; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; font-size: 0.8rem; line-height: 1.4; margin-bottom: 15px; font-family: monospace;">
+                  <span style="color: var(--text-muted);">Bellek yükleniyor...</span>
+                </div>
+                <button class="btn btn-reject" id="btn-clear-all-memories" style="width: 100%;">Tüm Hafıza Geçmişini Temizle (Wipe)</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 4: Documentation / Help -->
+        <div class="tab-panel" id="panel-help">
+          <div class="help-layout">
+            <h2>Local AI Computer-Use Agent Documentation</h2>
+            <div class="help-card">
+              <h3>How to run LM Studio for the Agent</h3>
+              <ol>
+                <li>Download and open <strong>LM Studio</strong>.</li>
+                <li>Download a code-instruct model like <strong>Qwen/Qwen2.5-Coder-7B-Instruct</strong> or <strong>meta-llama/Llama-3-8B-Instruct</strong>.</li>
+                <li>Go to the <strong>Developer / Server tab</strong> (left sidebar symbol with double brackets `</>`).</li>
+                <li>Select the loaded model at the top.</li>
+                <li>Ensure the local server port is set to `1234` and click <strong>Start Server</strong>.</li>
+                <li>Type your task in the chat window of this browser agent!</li>
+              </ol>
+            </div>
+
+            <div class="help-card">
+              <h3>Security Rules</h3>
+              <ul>
+                <li><strong>Strict Sandbox Confirmation</strong>: The local server runs command prompts and interacts with files. However, it will never perform any task until you click the <strong>Approve Action</strong> button.</li>
+                <li><strong>Command Editing</strong>: If you see the agent write an argument incorrectly or try to add something you do not want, you can edit the arguments inside the text editor box on the approval screen before approving it.</li>
+                <li><strong>Command Blacklisting</strong>: The safety filter runs commands against a regex validator to lock down critical directories and destructive procedures (such as deleting system databases).</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+      </section>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Environment configurations
+.env
+
+# Local configuration files (copy from config/*.example.json)
+config/kurucu.json
+config/config.json
+config/permissions.json
+
+# Binaries & Downloads
+bin/
+*.exe
+
+# Runtime generated directories & logs
+logs/
+*.log
+.container/
+.DS_Store
+Thumbs.db

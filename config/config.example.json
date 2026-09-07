@@ -1,0 +1,16 @@
+[
+  {
+    "admins": [
+      "YOUR_DISCORD_USER_ID_HERE"
+    ],
+    "connectionSpeedLimit": 0.7,
+    "founderKey": "CHANGE_THIS_TO_A_SECURE_SECRET",
+    "lpmMode": true,
+    "lpmBatchSize": 4,
+    "lpmOmMode": true,
+    "forceTaskPlan": false,
+    "simbaEnabled": true,
+    "sgmMode": true,
+    "esYabanciMode": true
+  }
+]

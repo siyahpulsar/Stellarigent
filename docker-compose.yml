@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  ai-agent:
+    build: .
+    container_name: local-ai-agent
+    ports:
+      - "3000:3000"
+    volumes:
+      # Persist config and libraries
+      - ./config:/app/config
+      - ./Libraries:/app/Libraries
+      - ./.env:/app/.env
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    # Add capabilities for Puppeteer
+    cap_add:
+      - SYS_ADMIN
