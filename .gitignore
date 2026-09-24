@@ -1,21 +1,45 @@
-# Dependencies
+# Node dependencies
 node_modules/
 
 # Environment configurations
 .env
 
-# Local configuration files (copy from config/*.example.json)
+# Configuration files containing personal IDs, customized runtime rules, setup state, or keys
 config/kurucu.json
 config/config.json
 config/permissions.json
+config/memory.json
+config/setup.json
+config/*.tmp
+config/*.test_backup.json
+config/*.emergency_backup.json
 
-# Binaries & Downloads
+# AI devlogs, internal notes, and publisher audit files
+.ai/
+byAI/
+
+# Local temp directories, staging sandboxes & cache
 bin/
-*.exe
+scratch/*
+!scratch/.gitkeep
+scratch/checkpoints/*
+!scratch/checkpoints/.gitkeep
+user_profiles/*
+!user_profiles/.gitkeep
+library/*
+!library/.gitkeep
+.container/*
+!.container/.gitkeep
+.container/scratch/*
+!.container/scratch/.gitkeep
 
-# Runtime generated directories & logs
-logs/
+# System & log files
+logs/*
+!logs/.gitkeep
 *.log
-.container/
+*.webm
+*.part
+*.mp3
+*.gif
 .DS_Store
 Thumbs.db

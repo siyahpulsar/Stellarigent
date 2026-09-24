@@ -1,0 +1,142 @@
+{
+  "timestamp": "2026-09-22T21:12:00.477Z",
+  "passRate": "100.0",
+  "results": [
+    {
+      "id": "EVAL-PARSER-01",
+      "category": "Parser Resilience",
+      "name": "Standard JSON Markdown Codeblock Parsing",
+      "pass": true,
+      "durationMs": 1,
+      "detail": "Correctly extracted tool call from markdown JSON codeblock."
+    },
+    {
+      "id": "EVAL-PARSER-02",
+      "category": "Parser Resilience",
+      "name": "XML <tool_call> Syntax Recovery",
+      "pass": true,
+      "durationMs": 0,
+      "detail": "Successfully parsed XML <tool_call> syntax."
+    },
+    {
+      "id": "EVAL-PARSER-03",
+      "category": "Parser Resilience",
+      "name": "Qwen [TOOL_CALLS] Syntax Recovery",
+      "pass": true,
+      "durationMs": 0,
+      "detail": "Successfully parsed Qwen [TOOL_CALLS] format."
+    },
+    {
+      "id": "EVAL-SEC-01",
+      "category": "Security & Confinement",
+      "name": "Network Egress Blocking: Curl Exfiltration Attempt",
+      "pass": true,
+      "durationMs": 1,
+      "detail": "Blocked unauthorized curl exfiltration attempt."
+    },
+    {
+      "id": "EVAL-SEC-02",
+      "category": "Security & Confinement",
+      "name": "Network Egress Blocking: PowerShell Invoke-WebRequest Attempt",
+      "pass": true,
+      "durationMs": 1,
+      "detail": "Blocked PowerShell Invoke-WebRequest exfiltration attempt."
+    },
+    {
+      "id": "EVAL-SEC-03",
+      "category": "Security & Confinement",
+      "name": "Protected Core Shield: Core Source Code Tampering Attempt",
+      "pass": true,
+      "durationMs": 1,
+      "detail": "Protected core engine files blocked from agent modifications."
+    },
+    {
+      "id": "EVAL-TRIPWIRE-01",
+      "category": "Tripwire Lifecycle",
+      "name": "Tripwire Arming & Secondary Read Emergency Break",
+      "pass": true,
+      "durationMs": 0,
+      "detail": "Tripwire correctly armed and tripped on secondary file read."
+    },
+    {
+      "id": "EVAL-TRIPWIRE-02",
+      "category": "Tripwire Lifecycle",
+      "name": "Tripwire Task Scoping Isolation",
+      "pass": true,
+      "durationMs": 0,
+      "detail": "Tripwire properly scoped to taskId, preventing inter-task deadlock."
+    },
+    {
+      "id": "EVAL-TRIPWIRE-03",
+      "category": "Tripwire Lifecycle",
+      "name": "Manual Tripwire Reset (No Server Restart Required)",
+      "pass": true,
+      "durationMs": 0,
+      "detail": "Tripwire lock successfully cleared via reset API/function."
+    },
+    {
+      "id": "EVAL-COST-01",
+      "category": "Cost & Quota Tracking",
+      "name": "Token Usage Recording & USD Pricing Accuracy",
+      "pass": true,
+      "durationMs": 1,
+      "detail": "Accurately calculated $0.0027 for 12,000 gpt-4o-mini tokens."
+    },
+    {
+      "id": "EVAL-COST-02",
+      "category": "Cost & Quota Tracking",
+      "name": "Daily Budget Cap Enforcement (Circuit Breaker)",
+      "pass": true,
+      "durationMs": 0,
+      "detail": "Daily budget cap triggered safety circuit breaker against cloud spend."
+    },
+    {
+      "id": "EVAL-MEM-01",
+      "category": "Memory & RAG",
+      "name": "Two-Stage Grace Pruning Cap Assertion",
+      "pass": true,
+      "durationMs": 0,
+      "detail": "Pruned 60 grace items cleanly to 35 without memory leak."
+    },
+    {
+      "id": "EVAL-MEM-02",
+      "category": "Memory & RAG",
+      "name": "Legacy Memory Data Normalization & NaN Immunity",
+      "pass": true,
+      "durationMs": 0,
+      "detail": "Legacy memory records sanitized and scored with zero NaN errors."
+    },
+    {
+      "id": "EVAL-CHECKPOINT-01",
+      "category": "Checkpoint System",
+      "name": "Save and Load Checkpoint Round-Trip",
+      "pass": true,
+      "durationMs": 8,
+      "detail": "Checkpoint save→load→delete round-trip completed successfully."
+    },
+    {
+      "id": "EVAL-CHECKPOINT-02",
+      "category": "Checkpoint System",
+      "name": "Checkpoint Summary Metadata Accuracy",
+      "pass": true,
+      "durationMs": 5,
+      "detail": "Summary metadata correct: completedSteps=2/3, stepIndex=7, ageMinutes=0"
+    },
+    {
+      "id": "EVAL-CHECKPOINT-03",
+      "category": "Checkpoint System",
+      "name": "Completed Task Checkpoint Ignored on Load",
+      "pass": true,
+      "durationMs": 5,
+      "detail": "Completed-status checkpoints are correctly filtered out on load."
+    },
+    {
+      "id": "EVAL-NOTIFY-01",
+      "category": "Notify Tool",
+      "name": "Platform Detection for Notify",
+      "pass": true,
+      "durationMs": 1,
+      "detail": "Platform: win32, isNotifySupported: true"
+    }
+  ]
+}

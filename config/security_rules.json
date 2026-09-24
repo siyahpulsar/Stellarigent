@@ -71,9 +71,8 @@
     "spankbang.com"
   ],
   "allowedBaseFolders": [
-    "Libraries",
-    "random_facts",
-    "config",
-    "scratch"
+    "scratch",
+    "By_Agent",
+    "Libraries"
   ]
 }

@@ -18,6 +18,7 @@ const { downloadImage, checkImageWithAI, urlImageReader, extractChartData } = re
 const { filterOutput, lineChecker, extractUrlsFromText } = require('./filters');
 const { getAvailableGuides } = require('../state');
 const { readPdf } = require('./pdfReader');
+const { sendSystemNotification } = require('./notify');
 
 // Checks the vision capability of the AI in LM Studio and stores it in RAM
 async function checkVisionCapability() {
@@ -120,8 +121,9 @@ ${packageJsonScripts}
 async function executeTool(targetAction) {
   let toolResult;
   try {
-    const { config } = require('../state');
-    if (config.forceTaskPlan && (!agentState.planSteps || agentState.planSteps.length === 0) && targetAction.action !== 'task_plan' && targetAction.action !== 'select_guide') {
+    const { config, agentState } = require('../state');
+    const isNoTaskPlanMode = agentState.activeMode === 'manuel' || agentState.activeMode === 'research' || agentState.activeMode === 'library';
+    if (!isNoTaskPlanMode && config.forceTaskPlan && (!agentState.planSteps || agentState.planSteps.length === 0) && targetAction.action !== 'task_plan' && targetAction.action !== 'select_guide') {
       return { success: false, message: "ERROR: You are in the initial planning phase. You MUST use 'task_plan' first before any other tool." };
     }
 
@@ -222,6 +224,14 @@ async function executeTool(targetAction) {
       case 'send_discord_message':
         toolResult = await discordBot.sendChannelMessage(targetAction.content, targetAction.filePath, { isDiscordMessageTool: true });
         break;
+      case 'notify_user': {
+        // Kullanıcıya sistem bildirim i gönder (Windows/macOS/Linux toast)
+        const notifyTitle = targetAction.title || 'Stellarigent Ajan Bildirimi';
+        const notifyMessage = targetAction.message || targetAction.explanation || 'Ajandan bildirim.';
+        const notifyLevel = targetAction.level || 'info'; // 'info' | 'warning' | 'error'
+        toolResult = await sendSystemNotification(notifyTitle, notifyMessage, notifyLevel);
+        break;
+      }
       case 'filter_output':
         toolResult = filterOutput(targetAction.query, targetAction.filter_type);
         if (toolResult && toolResult.success) {
@@ -237,9 +247,25 @@ async function executeTool(targetAction) {
       case 'line_checker':
         toolResult = await lineChecker(targetAction.path, targetAction.query);
         break;
-      case 'library_mode':
-        toolResult = { success: true, message: `Entering LibraryMode search for: "${targetAction.search}"` };
+      case 'library_mode': {
+        // Stub kaldırıldı — runLibraryModeSubLoop doğrudan çağrılıyor.
+        // Bu sayede Discord, manuel araç veya sub-agent üzerinden gelen çağrılar
+        // da gerçek kütüphane araması yapıyor (agent.js monkey-patch bağımlılığı ortadan kalktı).
+        try {
+          const { runLibraryModeSubLoop } = require('../modes/libraryMode');
+          const libraryResults = await runLibraryModeSubLoop(
+            targetAction.search || '',
+            targetAction.explanation || ''
+          );
+          toolResult = {
+            success: true,
+            message: libraryResults || 'Kütüphane araması tamamlandı ancak sonuç döndürülmedi.'
+          };
+        } catch (libErr) {
+          toolResult = { success: false, message: `LibraryMode hatası: ${libErr.message}` };
+        }
         break;
+      }
       default:
         toolResult = { success: false, message: `Unknown action: ${targetAction.action}` };
     }

@@ -28,7 +28,14 @@ const state = {
 
 function saveConfig() {
   try {
+    let existing = {};
+    if (fs.existsSync(CONFIG_FILE)) {
+      const raw = fs.readFileSync(CONFIG_FILE, 'utf-8');
+      const parsed = JSON.parse(raw);
+      existing = Array.isArray(parsed) ? (parsed[0] || {}) : parsed;
+    }
     const data = [{
+      ...existing,
       admins: state.discordState.admins,
       connectionSpeedLimit: state.discordState.connectionSpeedLimit,
       maxLibraryGB: state.discordState.maxLibraryGB,

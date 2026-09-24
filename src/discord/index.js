@@ -1,6 +1,6 @@
 const { initDiscordBot } = require('./client');
 const { state, saveConfig, savePermissions } = require('./state');
-const { updateDiscordStatus, sendDiscordFinalResult, sendChannelMessage, sendApprovalRequest } = require('./agentBridge');
+const { updateDiscordStatus, sendDiscordFinalResult, sendChannelMessage, sendApprovalRequest, sendPendingRuleProposal } = require('./agentBridge');
 
 module.exports = {
   initDiscordBot,
@@ -46,5 +46,6 @@ module.exports = {
   updateDiscordStatus,
   sendDiscordFinalResult,
   sendChannelMessage,
-  sendApprovalRequest
+  sendApprovalRequest,
+  sendPendingRuleProposal
 };

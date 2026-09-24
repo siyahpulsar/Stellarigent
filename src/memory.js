@@ -1,64 +1,331 @@
 const fs = require('fs');
 const path = require('path');
-const { exec } = require('child_process');
+const { exec, execFile } = require('child_process');
 const { agentState, broadcastTerminal } = require('./state');
 const { getEmbedding, cosineSimilarity } = require('./rag/vectorSearch');
 
 const MEMORY_FILE_PATH = path.join(__dirname, '..', 'config', 'memory.json');
 
-async function loadMemory() {
-  try {
-    try { await fs.promises.access(MEMORY_FILE_PATH); } catch { return []; }
-    const data = JSON.parse(await fs.promises.readFile(MEMORY_FILE_PATH, 'utf-8'));
-    if (Array.isArray(data)) return data;
-  } catch (e) {
-    console.error("Failed to load memory:", e);
-  }
-  return [];
+// --- ASYNC MEMORY WRITE QUEUE & EXPONENTIAL BACKOFF (Windows EPERM Protection) ---
+let writeQueue = Promise.resolve();
+let pendingFlushBuffer = null; // In-memory fallback buffer when OS lock exhausts all retries
+
+function enqueueMemoryTask(taskFn) {
+  const promise = writeQueue.then(taskFn, taskFn);
+  writeQueue = promise.catch(() => {});
+  return promise;
 }
 
-async function saveMemory(memories) {
-  try {
-    await fs.promises.writeFile(MEMORY_FILE_PATH, JSON.stringify(memories, null, 2), 'utf-8');
-  } catch (e) {
-    console.error("Failed to save memory:", e);
+async function safeAtomicWrite(filePath, data, maxRetries = 3) {
+  const tmpPath = `${filePath}.${Date.now()}.${Math.random().toString(36).substr(2, 6)}.tmp`;
+  let delay = 100;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await fs.promises.writeFile(tmpPath, data, 'utf-8');
+      await fs.promises.rename(tmpPath, filePath);
+      pendingFlushBuffer = null; // Flushed successfully to disk
+      return true;
+    } catch (err) {
+      try { await fs.promises.unlink(tmpPath); } catch {}
+      if (attempt === maxRetries) {
+        // Last-resort direct write fallback
+        try {
+          await fs.promises.writeFile(filePath, data, 'utf-8');
+          pendingFlushBuffer = null;
+          return true;
+        } catch (directErr) {
+          // Antivirus/Windows Defender held handle: store in RAM buffer for deferred flush
+          pendingFlushBuffer = data;
+          console.warn(`[MEMORY QUEUE WARNING] OS file lock prevented writing to ${filePath}. Data preserved in RAM pendingFlushBuffer for deferred flush:`, directErr.message);
+          return false;
+        }
+      }
+      await new Promise(res => setTimeout(res, delay));
+      delay = Math.floor(delay * 2.5); // 100ms -> 250ms -> 625ms
+    }
   }
+}
+
+// --- EMERGENCY EXIT FLUSH (Zero Data Loss on Process Crash) ---
+function emergencyFlushSync() {
+  if (pendingFlushBuffer) {
+    try {
+      console.warn('[MEMORY EMERGENCY] Process terminating: synchronously flushing pendingFlushBuffer to disk...');
+      fs.writeFileSync(MEMORY_FILE_PATH, pendingFlushBuffer, 'utf-8');
+      pendingFlushBuffer = null;
+    } catch (err) {
+      try {
+        const emergencyPath = path.join(__dirname, '..', 'config', 'memory.emergency_backup.json');
+        fs.writeFileSync(emergencyPath, pendingFlushBuffer, 'utf-8');
+        console.warn(`[MEMORY EMERGENCY] Saved emergency fallback to ${emergencyPath}`);
+      } catch {}
+    }
+  }
+}
+
+if (typeof process !== 'undefined') {
+  process.on('beforeExit', emergencyFlushSync);
+  process.on('SIGINT', () => { emergencyFlushSync(); process.exit(0); });
+  process.on('SIGTERM', () => { emergencyFlushSync(); process.exit(0); });
+}
+
+// --- LEGACY DATA NORMALIZER & MIGRATION HELPER ---
+function normalizeMemoryItem(item) {
+  if (!item || typeof item !== 'object') return null;
+  const rawDate = item.createdAt || item.date;
+  const parsedTime = rawDate ? new Date(rawDate).getTime() : NaN;
+  const validCreatedAt = !isNaN(parsedTime) ? new Date(parsedTime).toISOString() : new Date(0).toISOString();
+
+  return {
+    ...item,
+    task: item.task || item.rule || item.summary || 'Legacy Task',
+    summary: item.summary || item.rule || item.task || '',
+    rule: item.rule || (item.isRule ? item.summary : undefined),
+    isRule: Boolean(item.isRule || item.category === 'SECURITY_VIOLATION'),
+    category: item.category || (item.isRule ? 'SECURITY_VIOLATION' : 'GENERAL'),
+    createdAt: validCreatedAt,
+    date: item.date || validCreatedAt,
+    accessCount: (typeof item.accessCount === 'number' && !isNaN(item.accessCount)) ? Math.max(0, item.accessCount) : 0,
+    exceptions: Array.isArray(item.exceptions) ? item.exceptions : []
+  };
+}
+
+// --- DATA STORE LOADER & SAVER (Store = { memories: [], pendingRules: [] }) ---
+
+async function loadMemoryStore() {
+  if (pendingFlushBuffer) {
+    try {
+      const data = JSON.parse(pendingFlushBuffer);
+      const rawMemories = Array.isArray(data) ? data : (Array.isArray(data.memories) ? data.memories : []);
+      const rawPending = Array.isArray(data.pendingRules) ? data.pendingRules : [];
+      return {
+        memories: rawMemories.map(normalizeMemoryItem).filter(Boolean),
+        pendingRules: rawPending
+      };
+    } catch {}
+  }
+  try {
+    try { await fs.promises.access(MEMORY_FILE_PATH); } catch { return { memories: [], pendingRules: [] }; }
+    const raw = await fs.promises.readFile(MEMORY_FILE_PATH, 'utf-8');
+    const data = JSON.parse(raw);
+    const rawMemories = Array.isArray(data) ? data : (Array.isArray(data.memories) ? data.memories : []);
+    const rawPending = Array.isArray(data.pendingRules) ? data.pendingRules : [];
+    return {
+      memories: rawMemories.map(normalizeMemoryItem).filter(Boolean),
+      pendingRules: rawPending
+    };
+  } catch (e) {
+    console.error("Failed to load memory store:", e);
+    return { memories: [], pendingRules: [] };
+  }
+}
+
+async function saveMemoryStore(store) {
+  return enqueueMemoryTask(async () => {
+    const jsonStr = JSON.stringify(store, null, 2);
+    await safeAtomicWrite(MEMORY_FILE_PATH, jsonStr);
+  });
+}
+
+// Backward compatible loadMemory (returns array)
+async function loadMemory() {
+  const store = await loadMemoryStore();
+  return store.memories;
+}
+
+// Atomic Read-Modify-Write inside the queue
+async function updateMemoryStore(mutatorFn) {
+  return enqueueMemoryTask(async () => {
+    const store = await loadMemoryStore();
+    await mutatorFn(store);
+    await safeAtomicWrite(MEMORY_FILE_PATH, JSON.stringify(store, null, 2));
+    return store;
+  });
+}
+
+// Backward compatible saveMemory (saves array)
+async function saveMemory(memories) {
+  return enqueueMemoryTask(async () => {
+    const store = await loadMemoryStore();
+    store.memories = memories;
+    await safeAtomicWrite(MEMORY_FILE_PATH, JSON.stringify(store, null, 2));
+  });
+}
+
+// --- DETERMINISTIC SCORING & TWO-STAGE PRUNING ---
+const W_ACCESS = 2.0;
+const DECAY_CONSTANT = 72; // Every 72 hours (3 days) of age without access decays 1 score point
+const GRACE_HOURS = 24;
+
+function calculateMemoryScore(item, now = Date.now()) {
+  const itemDate = item.createdAt || item.date;
+  const parsedTime = itemDate ? new Date(itemDate).getTime() : NaN;
+  const validTime = !isNaN(parsedTime) ? parsedTime : 0;
+  const ageInHours = Math.max(0, (now - validTime) / (1000 * 60 * 60));
+  const accessCount = (typeof item.accessCount === 'number' && !isNaN(item.accessCount)) ? item.accessCount : 0;
+  return (accessCount * W_ACCESS) - (ageInHours / DECAY_CONSTANT);
+}
+
+function pruneMemories(memories, maxMemories = 50, now = Date.now()) {
+  if (!Array.isArray(memories)) return [];
+  if (memories.length <= maxMemories) return memories;
+
+  const GRACE_CAP = Math.floor(maxMemories * 0.70); // Max 70% capacity reserved for grace period (35 for 50)
+  const graceThresholdMs = GRACE_HOURS * 3600000;
+
+  let gracePool = [];
+  let nonGracePool = [];
+
+  for (const m of memories) {
+    const itemDate = m.createdAt || m.date || now;
+    const ageMs = now - new Date(itemDate).getTime();
+    if (ageMs < graceThresholdMs) {
+      gracePool.push(m);
+    } else {
+      nonGracePool.push(m);
+    }
+  }
+
+  // Stage 1: Grace Pool Trimming
+  // If grace pool alone exceeds 70% capacity, trim it internally by score descending
+  if (gracePool.length > GRACE_CAP) {
+    gracePool.sort((a, b) => calculateMemoryScore(b, now) - calculateMemoryScore(a, now));
+    gracePool = gracePool.slice(0, GRACE_CAP);
+  }
+
+  // Stage 2: Non-Grace Pool Trimming
+  // If remaining grace pool + non-grace pool exceeds maxMemories, evict from non-grace pool ONLY
+  const currentTotal = gracePool.length + nonGracePool.length;
+  if (currentTotal > maxMemories) {
+    const neededRemoval = currentTotal - maxMemories;
+    nonGracePool.sort((a, b) => calculateMemoryScore(b, now) - calculateMemoryScore(a, now));
+    nonGracePool = nonGracePool.slice(0, Math.max(0, nonGracePool.length - neededRemoval));
+  }
+
+  return [...gracePool, ...nonGracePool];
+}
+
+// --- PENDING RULES LIFECYCLE (Max 10 FIFO, 7-Day TTL) ---
+const MAX_PENDING_RULES = 10;
+const PENDING_TTL_HOURS = 168; // 7 days
+
+function cleanStalePendingRules(pendingRules, now = Date.now()) {
+  if (!Array.isArray(pendingRules)) return [];
+  const maxAgeMs = PENDING_TTL_HOURS * 3600000;
+  return pendingRules.filter(r => {
+    const itemDate = r.createdAt || now;
+    const ageMs = now - new Date(itemDate).getTime();
+    return ageMs < maxAgeMs;
+  });
+}
+
+async function addPendingRule(ruleObj) {
+  return enqueueMemoryTask(async () => {
+    const store = await loadMemoryStore();
+    let pending = cleanStalePendingRules(store.pendingRules);
+
+    // FIFO overflow handling: if already at limit, drop oldest
+    if (pending.length >= MAX_PENDING_RULES) {
+      pending.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      while (pending.length >= MAX_PENDING_RULES) {
+        pending.shift();
+      }
+    }
+
+    const newPending = {
+      id: 'rule-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6),
+      rule: ruleObj.rule || ruleObj.text || String(ruleObj),
+      category: ruleObj.category || 'SECURITY_VIOLATION',
+      context: ruleObj.context || '',
+      exceptions: Array.isArray(ruleObj.exceptions) ? ruleObj.exceptions : [],
+      createdAt: new Date().toISOString(),
+      status: 'pending_review'
+    };
+    pending.push(newPending);
+    store.pendingRules = pending;
+    await safeAtomicWrite(MEMORY_FILE_PATH, JSON.stringify(store, null, 2));
+    return newPending;
+  });
+}
+
+async function approvePendingRule(ruleId) {
+  return enqueueMemoryTask(async () => {
+    const store = await loadMemoryStore();
+    const idx = (store.pendingRules || []).findIndex(r => r.id === ruleId);
+    if (idx === -1) return null;
+
+    const [approved] = store.pendingRules.splice(idx, 1);
+    const nowIso = new Date().toISOString();
+    const newMemory = {
+      task: `[GÜVENLİK KURALI]: ${approved.rule}`,
+      summary: approved.rule,
+      rule: approved.rule,
+      isRule: true,
+      category: approved.category,
+      exceptions: Array.isArray(approved.exceptions) ? approved.exceptions : [],
+      accessCount: 1, // Explicit user approval grants 1 initial access boost
+      createdAt: nowIso,
+      date: nowIso
+    };
+    store.memories.push(newMemory);
+
+    const { config } = require('./state');
+    const memLimit = (config && config.memoryLimit) || 50;
+    store.memories = pruneMemories(store.memories, memLimit);
+
+    await safeAtomicWrite(MEMORY_FILE_PATH, JSON.stringify(store, null, 2));
+    return newMemory;
+  });
+}
+
+async function rejectPendingRule(ruleId) {
+  return enqueueMemoryTask(async () => {
+    const store = await loadMemoryStore();
+    const idx = (store.pendingRules || []).findIndex(r => r.id === ruleId);
+    if (idx === -1) return false;
+    store.pendingRules.splice(idx, 1);
+    await safeAtomicWrite(MEMORY_FILE_PATH, JSON.stringify(store, null, 2));
+    return true;
+  });
 }
 
 async function appendToMemory(task, summary, extraData = {}) {
-  try {
-    const memories = await loadMemory();
-    const { config } = require('./state');
-    
-    // Attempt to vectorize memory
-    let vector = null;
-    if (config.lmStudioUrl) {
-      vector = await getEmbedding(task + " " + summary, config.lmStudioUrl);
-    }
-    
-    memories.push({
-      task,
-      summary,
-      toolsUsed: extraData.toolsUsed || [],
-      thoughts: extraData.thoughts || [],
-      errors: extraData.errors || [],
-      posNegAspects: extraData.posNegAspects || "",
-      vector, // Store embedding
-      accessCount: 0,
-      date: new Date().toISOString()
-    });
-    const memLimit = config.memoryLimit || 1000;
-    if (memories.length > memLimit) {
-      memories.sort((a, b) => (a.accessCount || 0) - (b.accessCount || 0));
-      // Sınırı aşan kadarını baştan (en az erişilen) çıkar
-      while(memories.length > memLimit) {
-        memories.shift();
+  return enqueueMemoryTask(async () => {
+    try {
+      const store = await loadMemoryStore();
+      const { config } = require('./state');
+
+      let vector = null;
+      if (config.lmStudioUrl) {
+        vector = await getEmbedding(task + " " + summary, config.lmStudioUrl);
       }
+
+      const nowIso = new Date().toISOString();
+      store.memories.push({
+        task,
+        summary,
+        toolsUsed: extraData.toolsUsed || [],
+        thoughts: extraData.thoughts || [],
+        errors: extraData.errors || [],
+        posNegAspects: extraData.posNegAspects || "",
+        vector,
+        accessCount: 0,
+        createdAt: nowIso,
+        date: nowIso
+      });
+
+      const memLimit = (config && config.memoryLimit) || 50;
+      store.memories = pruneMemories(store.memories, memLimit);
+
+      // Also clean up any stale pending rules during periodic memory appends
+      store.pendingRules = cleanStalePendingRules(store.pendingRules);
+
+      await safeAtomicWrite(MEMORY_FILE_PATH, JSON.stringify(store, null, 2));
+    } catch (e) {
+      console.error("Failed to append to memory:", e);
     }
-    await saveMemory(memories);
-  } catch (e) {
-    console.error("Failed to append to memory:", e);
-  }
+  });
 }
 
 async function getMemoryPrompt(currentTaskQuery) {
@@ -86,8 +353,11 @@ async function getMemoryPrompt(currentTaskQuery) {
 
         const promptText = `Gelen İstek: ${currentTaskQuery}\n\nBu gelen isteğe göre aşağıda listelenmiş özetlere bakarak hangi numaralı hafızalar sana gelen istek ile uyumludur? Sadece ve sadece virgülle ayrılmış numaraları döndür (Örnek: 1,3,15). Başka hiçbir kelime veya açıklama yazma. Eğer hiçbiri uyumlu değilse boş bırak.\n\nHafızalar:\n${memoryListText}`;
 
+        const { config } = require('./state');
+        const defaultMemPrompt = 'Sen sadece ilgili numaraları virgülle döndüren bir robotsun. Cümle kurma.';
+        const memPrompt = (config && config.systemPrompts && config.systemPrompts.simba_memory_search) || defaultMemPrompt;
         const messages = [
-          { role: 'system', content: 'Sen sadece ilgili numaraları virgülle döndüren bir robotsun. Cümle kurma.' },
+          { role: 'system', content: memPrompt },
           { role: 'user', content: promptText }
         ];
 
@@ -193,20 +463,42 @@ async function getMemoryPrompt(currentTaskQuery) {
     selectedMemories = [];
   }
 
-  let prompt = "\n\n=== RECALLED MEMORY OF PAST TASKS ===\n";
-  selectedMemories.forEach((m, idx) => {
+  if (selectedMemories.length === 0) return '';
+  selectedMemories = selectedMemories.slice(0, 3); // STRICT LIMIT: Prevent prompt saturation (Max top-3 recalled items)
+
+  let prompt = "\n\n=== RECALLED MEMORY OF PAST TASKS & VERIFIED RULES ===\n";
+  const rules = selectedMemories.filter(m => m.isRule);
+  const tasks = selectedMemories.filter(m => !m.isRule);
+
+  if (rules.length > 0) {
+    prompt += "\n[KANITLANMIŞ GÜVENLİK KURALLARI VE DERSLER]:\n";
+    rules.forEach((r, idx) => {
+      const excStr = (r.exceptions && r.exceptions.length > 0) ? ` (İstisnalar: ${r.exceptions.join(', ')})` : '';
+      prompt += `* Kural ${idx + 1}: ${r.rule || r.summary}${excStr}\n`;
+    });
+  }
+
+  if (tasks.length > 0) {
+    prompt += "\n[GEÇMİŞ GÖREV DENEYİMLERİ]:\n";
+    tasks.forEach((m, idx) => {
+      prompt += `\n--- Geçmiş Görev ${idx + 1} ---\n`;
+      prompt += `Görev: "${m.task}"\n`;
+      prompt += `Özet: ${m.summary}\n`;
+      if (m.toolsUsed && m.toolsUsed.length > 0) prompt += `Kullanılan Araçlar: ${m.toolsUsed.join(', ')}\n`;
+      if (m.thoughts && m.thoughts.length > 0) prompt += `Düşünceler: ${m.thoughts.join(' | ')}\n`;
+      if (m.errors && m.errors.length > 0) prompt += `Karşılaşılan Hatalar: ${m.errors.join(' | ')}\n`;
+      if (m.posNegAspects && m.posNegAspects.what_went_well) prompt += `İyi Gidenler: ${m.posNegAspects.what_went_well}\n`;
+      if (m.posNegAspects && m.posNegAspects.what_went_wrong) prompt += `Düzeltilmesi Gerekenler: ${m.posNegAspects.what_went_wrong}\n`;
+    });
+  }
+
+  // Increment accessCount only for items actually selected and included in prompt
+  selectedMemories.forEach(m => {
     m.accessCount = (m.accessCount || 0) + 1;
-    prompt += `\n--- Memory ${idx + 1} ---\n`;
-    prompt += `Task: "${m.task}"\n`;
-    prompt += `Summary: ${m.summary}\n`;
-    if (m.toolsUsed && m.toolsUsed.length > 0) prompt += `Tools Used: ${m.toolsUsed.join(', ')}\n`;
-    if (m.thoughts && m.thoughts.length > 0) prompt += `Thoughts: ${m.thoughts.join(' | ')}\n`;
-    if (m.errors && m.errors.length > 0) prompt += `Errors: ${m.errors.join(' | ')}\n`;
-    if (m.posNegAspects && m.posNegAspects.what_went_well) prompt += `What Went Well: ${m.posNegAspects.what_went_well}\n`;
-    if (m.posNegAspects && m.posNegAspects.what_went_wrong) prompt += `What Went Wrong: ${m.posNegAspects.what_went_wrong}\n`;
   });
+
   await saveMemory(memories).catch(() => {});
-  prompt += "=====================================\n";
+  prompt += "======================================================\n";
   return prompt;
 }
 
@@ -268,7 +560,7 @@ async function updateWorkspaceReadme(task, summary) {
 
     const filesList = await getFolderStructureSummary(agentState.cwd);
 
-    let updatedContent = `# Local AI Agent Project Workspace\n\n## Directory Structure\n\`\`\`\n${filesList}\n\`\`\`\n\n## What I Accomplished & Learned\n`;
+    let updatedContent = `# Stellarigent Project Workspace\n\n## Directory Structure\n\`\`\`\n${filesList}\n\`\`\`\n\n## What I Accomplished & Learned\n`;
 
     let historySection = '';
     if (currentContent.includes('## What I Accomplished & Learned')) {
@@ -394,7 +686,7 @@ function filterReadmeByKeywords(readmeText, queryText) {
   return result.trim();
 }
 
-// Git auto commit helper
+// Git auto commit helper (Using execFile to prevent shell injection)
 async function runGitCommit(task, summary) {
   const gitDir = path.join(agentState.cwd, '.git');
   const gitExists = await fs.promises.access(gitDir).then(() => true).catch(() => false);
@@ -404,28 +696,52 @@ async function runGitCommit(task, summary) {
   }
 
   return new Promise((resolve) => {
-    broadcastTerminal(`\n> [GIT AUTO-COMMIT] Staging changes and committing...\n`);
-    const safeTask = task.substring(0, 50).replace(/["'`$\\&|<>\r\n]/g, '');
-    const safeSummary = summary.replace(/["'`$\\&|<>\r\n]/g, '');
-    const commitMsg = `feat(agent): accomplished task - ${safeTask}...\n\nSummary: ${safeSummary}`;
-    const gitCmd = `git add . && git commit -m "${commitMsg}"`;
+    broadcastTerminal(`\n> [GIT AUTO-COMMIT] Staging tracked changes (git add -u) and committing...\n> [GIT AUTO-COMMIT] Not: Takip edilmeyen (untracked) yeni dosyalar otomatik eklenmez.\n`);
+    const safeTask = (task || '').substring(0, 60).replace(/[\r\n]/g, ' ').trim();
+    const safeSummary = (summary || '').substring(0, 80).replace(/[\r\n]/g, ' ').trim();
+    const commitMsg = `feat(agent): ${safeTask} | ${safeSummary}`;
 
-    exec(gitCmd, { cwd: agentState.cwd }, (error, stdout, stderr) => {
-      if (error) {
-        broadcastTerminal(`> [GIT AUTO-COMMIT ERROR] ${stderr || error.message}\n`);
-        resolve({ success: false, message: error.message });
-      } else {
-        broadcastTerminal(`> [GIT AUTO-COMMIT SUCCESS] Committed changes successfully.\n${stdout}\n`);
-        resolve({ success: true, stdout });
+    // 1. Stage only tracked files safely via execFile
+    execFile('git', ['add', '-u'], { cwd: agentState.cwd }, (addErr, addStdout, addStderr) => {
+      if (addErr) {
+        broadcastTerminal(`> [GIT AUTO-COMMIT ERROR] git add -u failed: ${addStderr || addErr.message}\n`);
+        return resolve({ success: false, message: addErr.message });
       }
+
+      // 2. Commit safely via execFile without shell interpolation
+      execFile('git', ['commit', '-m', commitMsg], { cwd: agentState.cwd }, (commitErr, stdout, stderr) => {
+        if (commitErr) {
+          // If nothing to commit, it's not a catastrophic failure
+          if (stdout && stdout.includes('nothing to commit')) {
+            broadcastTerminal(`> [GIT AUTO-COMMIT] Nothing to commit, working tree clean.\n`);
+            return resolve({ success: true, stdout });
+          }
+          broadcastTerminal(`> [GIT AUTO-COMMIT ERROR] ${stderr || commitErr.message}\n`);
+          resolve({ success: false, message: commitErr.message });
+        } else {
+          broadcastTerminal(`> [GIT AUTO-COMMIT SUCCESS] Committed changes successfully.\n${stdout}\n`);
+          resolve({ success: true, stdout });
+        }
+      });
     });
   });
 }
 
 module.exports = {
   loadMemory,
+  loadMemoryStore,
+  saveMemoryStore,
+  updateMemoryStore,
+  saveMemory,
   appendToMemory,
   getMemoryPrompt,
+  calculateMemoryScore,
+  pruneMemories,
+  cleanStalePendingRules,
+  normalizeMemoryItem,
+  addPendingRule,
+  approvePendingRule,
+  rejectPendingRule,
   getWorkspaceRulesPrompt,
   getFolderStructureSummary,
   updateWorkspaceReadme,

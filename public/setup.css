@@ -1,0 +1,151 @@
+/* setup.css - İlk Kurulum (Setup) Modalı Sade Stilleri */
+
+.setup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.setup-overlay.hidden {
+  display: none !important;
+}
+
+.setup-modal-card {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 520px;
+  padding: 30px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  box-sizing: border-box;
+  color: #f8fafc;
+}
+
+.setup-modal-header {
+  margin-bottom: 24px;
+  border-bottom: 1px solid #334155;
+  padding-bottom: 16px;
+}
+
+.setup-modal-header h2 {
+  margin: 0 0 8px 0;
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #38bdf8;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.setup-modal-header p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #94a3b8;
+  line-height: 1.4;
+}
+
+.setup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.setup-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.setup-input-group label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.setup-input-group input {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 10px 14px;
+  color: #f8fafc;
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.setup-input-group input:focus {
+  border-color: #38bdf8;
+}
+
+.setup-input-group small {
+  font-size: 0.8rem;
+  color: #64748b;
+  line-height: 1.3;
+}
+
+.badge-required {
+  font-size: 0.75rem;
+  color: #f87171;
+  font-weight: normal;
+}
+
+.badge-optional {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  font-weight: normal;
+}
+
+.setup-status-msg {
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+  line-height: 1.4;
+}
+
+.setup-status-msg.hidden {
+  display: none;
+}
+
+.setup-actions {
+  margin-top: 8px;
+}
+
+.setup-actions button {
+  background: #0284c7;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, opacity 0.2s;
+}
+
+.setup-actions button:hover:not(:disabled) {
+  background: #0369a1;
+}
+
+.setup-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

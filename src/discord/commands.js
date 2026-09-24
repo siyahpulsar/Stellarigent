@@ -56,7 +56,7 @@ function runLibraryAutoclean() {
 async function handleCommand(message, command, args) {
   if (command === 'help') {
     const embed = new EmbedBuilder()
-      .setTitle("Stellarch Discord Bot Help")
+      .setTitle("Stellarigent Discord Bot Help")
       .setColor("#3b82f6")
       .setDescription("Kullanılabilir komutların listesi:")
       .addFields(

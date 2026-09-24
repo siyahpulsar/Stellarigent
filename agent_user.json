@@ -1,0 +1,7 @@
+{
+  "ai_modelleri": [
+    "qwen 2.5 3b"
+  ],
+  "agent_nihai_amaci": "Yalnızca user tarafından verilen emirleri uygulamak.",
+  "user_hakkinda": "Projenin yöneticisi ve kurucusu."
+}

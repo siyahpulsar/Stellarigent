@@ -18,8 +18,11 @@ const {
   sendAdminData,
   handleUpdateSettings,
   handleSaveAdminData,
-  handleClearMemories
+  handleClearMemories,
+  handleApprovePendingRule,
+  handleRejectPendingRule
 } = require('./settingsHandler');
+const { loadCheckpoint, deleteCheckpoint, getCheckpointSummary, restoreCheckpointToState } = require('../checkpoint');
 
 module.exports = function setupWebSocketHandler(wss, founderKey, discordBot, resolvePendingAction, broadcastDiscordState, broadcastSandboxState) {
   wss.on('connection', (ws) => {
@@ -47,9 +50,18 @@ module.exports = function setupWebSocketHandler(wss, founderKey, discordBot, res
           // Verify auth key
           const crypto = require('crypto');
           let isValid = false;
+          let activeKey = process.env.FOUNDER_KEY;
+          if (!activeKey) {
+            try {
+              const envObj = readEnv();
+              activeKey = envObj.FOUNDER_KEY;
+            } catch (e) {}
+          }
+          if (!activeKey) activeKey = founderKey;
+
           try {
-            if (founderKey && typeof data.key === 'string' && typeof founderKey === 'string' && data.key.length === founderKey.length) {
-              isValid = crypto.timingSafeEqual(Buffer.from(data.key), Buffer.from(founderKey));
+            if (activeKey && typeof data.key === 'string' && typeof activeKey === 'string' && data.key.length === activeKey.length) {
+              isValid = crypto.timingSafeEqual(Buffer.from(data.key), Buffer.from(activeKey));
             }
           } catch (e) {}
           
@@ -97,6 +109,19 @@ module.exports = function setupWebSocketHandler(wss, founderKey, discordBot, res
                 ws.send(JSON.stringify({ type: 'library_data', categories, files }));
               }
             } catch(e) { console.error('Error sending library_data:', e); }
+
+            // Checkpoint kontrolü: Yarıda kalmış görev varsa frontend'i bilgilendir
+            try {
+              const cp = loadCheckpoint();
+              if (cp) {
+                const summary = getCheckpointSummary(cp);
+                ws.send(JSON.stringify({ type: 'checkpoint_available', checkpoint: summary }));
+                console.log('[CHECKPOINT] Unfinished task found, notified frontend:', summary.task);
+              }
+            } catch (cpErr) {
+              console.warn('[CHECKPOINT] Failed to check checkpoint on auth:', cpErr.message);
+            }
+
           } else {
             console.log('Client provided invalid auth key. Closing connection.');
             ws.send(JSON.stringify({ type: 'error', message: 'Invalid admin key.' }));
@@ -107,9 +132,60 @@ module.exports = function setupWebSocketHandler(wss, founderKey, discordBot, res
       }
 
       switch (data.type) {
+        case 'reset_tripwire': {
+          const { resetTripwire } = require('../security');
+          const res = resetTripwire();
+          ws.send(JSON.stringify({ type: 'toast', message: res.message }));
+          broadcastState();
+          break;
+        }
+
         case 'client_log':
           log('FRONTEND', data.logData);
           break;
+
+        case 'resume_checkpoint': {
+          // Kullanıcı "devam et" dedi: checkpoint'i yükle ve ajan loop'unu başlat
+          if (agentState.status !== 'idle' && agentState.status !== 'completed' && agentState.status !== 'failed') {
+            ws.send(JSON.stringify({ type: 'error', message: 'Ajan zaten çalışıyor, checkpoint resume yapılamaz.' }));
+            break;
+          }
+          const cp = loadCheckpoint();
+          if (!cp) {
+            ws.send(JSON.stringify({ type: 'toast', message: 'Devam edilecek checkpoint bulunamadı.' }));
+            break;
+          }
+          const restored = restoreCheckpointToState(cp, agentState, config);
+          if (!restored) {
+            ws.send(JSON.stringify({ type: 'error', message: 'Checkpoint yüklenemedi.' }));
+            break;
+          }
+          broadcastTerminal(`\n*** [CHECKPOINT RESUME] Görev kaldığı yerden devam ediyor (Adım ${cp.stepIndex}): "${cp.task}" ***\n`);
+          agentState.status = 'thinking';
+          broadcastState();
+          ws.send(JSON.stringify({ type: 'toast', message: `Görev devamı: "${String(cp.task).substring(0, 60)}..."` }));
+
+          // Agent loop'u direkt çalıştır — state zaten geri yüklendi
+          const { runAgentLoop } = require('../agent');
+          runAgentLoop().then(() => {
+            if (agentState.status !== 'completed') {
+              agentState.status = 'idle';
+              broadcastState();
+            }
+          }).catch(err => {
+            broadcastTerminal(`> [CHECKPOINT RESUME ERROR] ${err.message}\n`);
+            agentState.status = 'failed';
+            broadcastState();
+          });
+          break;
+        }
+
+        case 'delete_checkpoint': {
+          // Kullanıcı "yoksay" dedi: checkpoint'i sil
+          deleteCheckpoint();
+          ws.send(JSON.stringify({ type: 'toast', message: 'Checkpoint silindi. Yeni görev başlatabilirsiniz.' }));
+          break;
+        }
 
         case 'user_message':
           if (agentState.status === 'library_ask_user') {
@@ -156,6 +232,7 @@ module.exports = function setupWebSocketHandler(wss, founderKey, discordBot, res
           if (agentState.activeMode === 'library') {
             agentState.task = finalTaskContent;
             agentState.status = 'thinking';
+            agentState.planSteps = []; // Kesinlikle task plan oluşturulmaz
             broadcastState();
             
             const { processLibraryTask } = require('../modes/libraryMode');
@@ -176,6 +253,7 @@ module.exports = function setupWebSocketHandler(wss, founderKey, discordBot, res
             agentState.task = finalTaskContent;
             agentState.status = 'thinking';
             agentState.messages = [];
+            agentState.planSteps = []; // Kesinlikle task plan oluşturulmaz
             broadcastState();
             broadcastTerminal(`\n*** [LIBRARY MOD] Manuel library search başlatılıyor (planlama atlandı)... ***\n`);
             
@@ -226,9 +304,46 @@ module.exports = function setupWebSocketHandler(wss, founderKey, discordBot, res
             await checkVisionCapability();
           }
 
+          // Manuel Tools Modu: Doğrudan tekil araç çalıştırır, ASLA task plan yapmaz
+          if (agentState.activeMode === 'manuel') {
+            const { runManuelTool } = require('../agent');
+            await runManuelTool(finalTaskContent);
+            break;
+          }
+
+          // Research Modu (Web, Local, Deep Web): Doğrudan araştırma çalıştırır, ASLA task plan yapmaz
+          if (agentState.activeMode === 'research') {
+            const sub = agentState.activeSubMode || 'web';
+
+            if (sub === 'deep_web') {
+              const { runDeepWebSearch } = require('../tools/web');
+              const pageCount = agentState.deepResearchPageCount || 20;
+              agentState.messages = [];
+              agentState.planSteps = [];
+              broadcastTerminal(`\n*** [DEEP RESEARCH] '${finalTaskContent}' için ${pageCount} sayfalık derin araştırma başlatılıyor (Planlama devre dışı)... ***\n`);
+              addMessage('user', finalTaskContent);
+              runDeepWebSearch(finalTaskContent, pageCount).then(res => {
+                const reply = (res && res.message) ? res.message : (typeof res === 'object' ? JSON.stringify(res, null, 2) : String(res));
+                addMessage('assistant', reply, 'Deep Research');
+                agentState.status = 'completed';
+                broadcastState();
+              }).catch(err => {
+                broadcastTerminal(`> [DEEP RESEARCH ERROR] ${err.message}\n`);
+                addMessage('assistant', `Derin araştırma sırasında hata oluştu: ${err.message}`);
+                agentState.status = 'failed';
+                broadcastState();
+              });
+              break;
+            }
+
+            const { runResearchTool } = require('../agent');
+            await runResearchTool(finalTaskContent);
+            break;
+          }
+
+          // Agent Runner / IDE Autonomous Swarm Modu (Sadece kod geliştirme görevleri planlama yapar)
           const { initializeIdeTaskContext, runIdeSwarmLoop } = require('../agent');
           await initializeIdeTaskContext(finalTaskContent);
-          // Trigger the new IDE Swarm loop
           runIdeSwarmLoop();
           break;
 
@@ -409,6 +524,14 @@ module.exports = function setupWebSocketHandler(wss, founderKey, discordBot, res
 
         case 'clear_memories':
           await handleClearMemories(ws);
+          break;
+
+        case 'approve_pending_rule':
+          await handleApprovePendingRule(data, ws);
+          break;
+
+        case 'reject_pending_rule':
+          await handleRejectPendingRule(data, ws);
           break;
 
         case 'manual_ai_response':

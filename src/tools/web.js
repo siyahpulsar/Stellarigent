@@ -3,6 +3,7 @@ const cheerio = require('cheerio');
 const { agentState, broadcastTerminal } = require('../state');
 const { checkBannedWebsites } = require('../security');
 const { sanitizeWebContent, cleanHiddenArtifacts, stripInjectionPatterns } = require('../security/webSanitizer');
+const { llmFetch } = require('../llm/llmClient');
 
 let sharedBrowser = null;
 let puppeteerUseCount = 0;
@@ -26,10 +27,15 @@ async function getSharedBrowser() {
       await sharedBrowser.close();
     } catch (e) {}
   }
-  broadcastTerminal(`\n> [PUPPETEER] Launching new shared Puppeteer browser instance...\n`);
+  const isLinuxOrRoot = process.platform === 'linux' || (typeof process.getuid === 'function' && process.getuid() === 0);
+  const launchArgs = isLinuxOrRoot
+    ? ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+    : ['--disable-dev-shm-usage'];
+
+  broadcastTerminal(`\n> [PUPPETEER] Launching new shared Puppeteer browser instance (Sandbox: ${isLinuxOrRoot ? 'Disabled for Linux/Docker' : 'Enabled (Secure host)'})...\n`);
   sharedBrowser = await puppeteer.launch({
     headless: "new",
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
+    args: launchArgs
   });
   puppeteerUseCount = 1;
   return sharedBrowser;
@@ -418,32 +424,25 @@ async function runDeepWebSearch(query, pageCount = 20) {
     
     if (broadcastDeepResearchProgress) broadcastDeepResearchProgress(i + 1, urls.length, url, "Yapay Zeka ile özetleniyor...");
     try {
-      const abortController = new AbortController();
-      const timeoutId = setTimeout(() => abortController.abort(), 60000);
-      const llmRes = await fetch(getLmStudioEndpoint('/chat/completions'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: config.modelName || 'default',
-          messages: [
-            { role: "system", content: "Sen profesyonel bir araştırmacısın. Sana verilen web sayfası metnini okuyup kullanıcının arama sorgusu ile ilgili en önemli bilgileri 2-3 cümleyle özetle. Yanıtta markdown kullanabilirsin." },
-            { role: "user", content: `Sorgu: ${query}\n\nSayfa Metni:\n${pageText}` }
-          ],
-          temperature: 0.1,
-          max_tokens: 300
-        }),
-        signal: abortController.signal
-      });
-      clearTimeout(timeoutId);
-      const data = await llmRes.json();
-      const summary = data.choices[0].message.content.trim();
+      // llmFetch kullanılarak model failover, cloud fallback ve manual bridge devreye giriyor
+      const summary = await llmFetch(
+        [
+          { role: "system", content: "Sen profesyonel bir araştırmacısın. Sana verilen web sayfası metnini okuyup kullanıcının arama sorgusu ile ilgili en önemli bilgileri 2-3 cümleyle özetle. Yanıtta markdown kullanabilirsin." },
+          { role: "user", content: `Sorgu: ${query}\n\nSayfa Metni:\n${pageText.substring(0, 8000)}` }
+        ],
+        0.1,
+        'deep_web_search_page_summary',
+        2,
+        'deep_web_search'
+      );
       summaries.push({ url, summary });
-      
+
       const snippet = summary.split(' ').slice(0, 15).join(' ') + '...';
       if (broadcastDeepResearchProgress) broadcastDeepResearchProgress(i + 1, urls.length, url, snippet);
       broadcastTerminal(`> [DEEP WEB SEARCH] Page ${i+1} summarized.\n`);
     } catch(e) {
-      if (broadcastDeepResearchProgress) broadcastDeepResearchProgress(i + 1, urls.length, url, "Özetleme başarısız oldu.");
+      if (broadcastDeepResearchProgress) broadcastDeepResearchProgress(i + 1, urls.length, url, `Özetleme başarısız oldu: ${e.message}`);
+      broadcastTerminal(`> [DEEP WEB SEARCH] Page ${i+1} summary failed: ${e.message}\n`);
     }
   }
   
@@ -455,24 +454,17 @@ async function runDeepWebSearch(query, pageCount = 20) {
   let combinedText = summaries.map((s, idx) => `[Kaynak ${idx+1}] (${s.url}):\n${s.summary}`).join('\n\n');
   let finalSummary = "";
   try {
-    const abortController = new AbortController();
-    const timeoutId = setTimeout(() => abortController.abort(), 120000);
-    const finalRes = await fetch(getLmStudioEndpoint('/chat/completions'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: config.modelName || 'default',
-        messages: [
-          { role: "system", content: "Sen uzman bir araştırmacısın. Birden fazla kaynaktan toplanan özetleri inceleyerek kullanıcının sorusuna kapsamlı, akıcı, zengin ve detaylı bir ana özet hazırla. Her bilginin sonuna kaynak atıflarını (örneğin [Kaynak 1]) mutlaka ekle. Çıktıda markdown kullan." },
-          { role: "user", content: `Sorgu: ${query}\n\nToplanan Özetler:\n${combinedText}` }
-        ],
-        temperature: 0.3
-      }),
-      signal: abortController.signal
-    });
-    clearTimeout(timeoutId);
-    const finalData = await finalRes.json();
-    finalSummary = finalData.choices[0].message.content.trim();
+    // Ana özet de llmFetch üzerinden geçiyor — failover + cloud fallback aktif
+    finalSummary = await llmFetch(
+      [
+        { role: "system", content: "Sen uzman bir araştırmacısın. Birden fazla kaynaktan toplanan özetleri inceleyerek kullanıcının sorusuna kapsamlı, akıcı, zengin ve detaylı bir ana özet hazırla. Her bilginin sonuna kaynak atıflarını (örneğin [Kaynak 1]) mutlaka ekle. Çıktıda markdown kullan." },
+        { role: "user", content: `Sorgu: ${query}\n\nToplanan Özetler:\n${combinedText}` }
+      ],
+      0.3,
+      'deep_web_search_final_summary',
+      2,
+      'deep_web_search'
+    );
   } catch(e) {
     return { success: false, message: "Ana özet oluşturulurken LLM hatası: " + e.message };
   }

@@ -4,6 +4,14 @@ let folderHistory = []; // Back-navigation history stack
 let ws = null;
 let authFailed = false;
 
+// main.js'in loadURL'de geçirdiği agentPort query param'dan portu oku.
+// Bu sayede .env'deki PORT değişikeni değerse IDE otomatik uyum sağlar.
+const _urlParams = new URLSearchParams(window.location.search);
+const AGENT_PORT = parseInt(_urlParams.get('agentPort') || '3000', 10);
+const AGENT_BASE_URL = `http://127.0.0.1:${AGENT_PORT}`;
+const AGENT_WS_URL = `ws://127.0.0.1:${AGENT_PORT}`;
+
+
 // --- Toast Notification System (replaces alert()) ---
 function showToast(message, type = 'info') {
   const existing = document.querySelector('.ide-toast');
@@ -30,7 +38,7 @@ function showToast(message, type = 'info') {
 function initWebSocket() {
   if (authFailed) return; // Only block on explicit auth rejection (not normal close)
 
-  ws = new WebSocket('ws://127.0.0.1:3000');
+  ws = new WebSocket(AGENT_WS_URL);
 
   ws.onopen = () => {
     authFailed = false;
@@ -472,12 +480,14 @@ async function fetchLmStudioModels() {
   const select = document.getElementById('setting-model');
   if (!select) return;
   try {
-    const res = await fetch('http://localhost:1234/api/v0/models', {
-      signal: AbortSignal.timeout(3000)
+    // Backend proxy kullanılıyor: v1 API uyumlu, port yapılandırmasından bağımsız.
+    // Eski: fetch('http://localhost:1234/api/v0/models') — deprecated v0 API, hardcoded port.
+    const res = await fetch(`${AGENT_BASE_URL}/api/lm-studio/models`, {
+      signal: AbortSignal.timeout(5000)
     });
     if (!res.ok) return;
     const json = await res.json();
-    const models = (json.data || json);
+    const models = json.models || json.data || json;
     if (!Array.isArray(models) || models.length === 0) return;
 
     const currentVal = select.value;

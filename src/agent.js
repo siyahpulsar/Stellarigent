@@ -10,11 +10,14 @@ const {
   broadcastState,
   broadcastTerminal,
   getAvailableGuides,
-  addMessage
+  addMessage,
+  addTransientError,
+  broadcastTaskStep,
+  clearTaskSteps
 } = require('./state');
 
 const { checkBannedWords, assessActionRisk } = require('./security');
-const { getMemoryPrompt, getWorkspaceRulesPrompt, filterReadmeByKeywords } = require('./memory');
+const { getMemoryPrompt, getWorkspaceRulesPrompt, filterReadmeByKeywords, addPendingRule } = require('./memory');
 const { checkVisionCapability, executeTool } = require('./tools');
 
 let pendingActionResolver = null;
@@ -25,23 +28,29 @@ let activeDiscordContext = null;
 // Usage: const text = await llmFetch(messages, temperature)
 // Retries LM Studio up to maxRetries before falling back to manual bridge mode.
 // -----------------------------------------------------------------------
-const { llmFetch, cleanMalformedJsonString, parseAssistantAction, resolveManualBridgeResponse, getDynamicSystemPrompt, IDE_PLANNER_PROMPT, IDE_CHECKER_PROMPT } = require('./llm/llmClient');
+const { llmFetch, cleanMalformedJsonString, parseAssistantAction, parseAssistantActionWithMeta, resolveManualBridgeResponse, getDynamicSystemPrompt, IDE_PLANNER_PROMPT, IDE_CHECKER_PROMPT, getIdePlannerPrompt, getIdeCheckerPrompt } = require('./llm/llmClient');
 const { runLibraryModeSubLoop } = require('./modes/libraryMode');
 const { prepareRequestMessages, getPlannerModeRules } = require('./agent/contextBuilder');
-
-
+const modelManager = require('./llm/modelManager');
+const performanceTracker = require('./llm/performanceTracker');
+const { saveCheckpoint, deleteCheckpoint } = require('./checkpoint');
+const { sendSystemNotification } = require('./tools/notify');
 
 async function fetchAndParseAction(requestMessages) {
   let assistantText = '';
   let action = null;
+  let parseTier = 1;
   let retries = 0;
   const maxRetries = 2;
+  const startTime = Date.now();
 
   while (retries <= maxRetries) {
     assistantText = await llmFetch(requestMessages, config.temperature, 'Agent Reasoning');
-    action = parseAssistantAction(assistantText);
+    const parsed = parseAssistantActionWithMeta(assistantText);
+    action = parsed.action;
+    parseTier = parsed.parseTier || 1;
 
-    if (!action && (assistantText.includes('{') || assistantText.includes('\`\`\`json'))) {
+    if (!action && (assistantText.includes('{') || assistantText.includes('```json'))) {
       retries++;
       if (retries <= maxRetries) {
         broadcastTerminal(`> [JSON PARSE ERROR] Model produced malformed JSON. Self-correcting (Attempt ${retries}/${maxRetries})...\n`);
@@ -52,7 +61,8 @@ async function fetchAndParseAction(requestMessages) {
     }
     break;
   }
-  return { assistantText, action };
+  const latencyMs = Math.max(1, Date.now() - startTime);
+  return { assistantText, action, parseTier, latencyMs, retries };
 }
 
 function recordActionThoughts(assistantText, action) {
@@ -87,7 +97,16 @@ function recordActionThoughts(assistantText, action) {
 
 async function requestUserApproval(action, steps) {
   let autoApproved = false;
-  if (config.autoApprove && config.autoApprove[action.action]) {
+
+  // CRITICAL risk check: Hard block or force manual review
+  if (action.risk && action.risk.level === 'CRITICAL') {
+    broadcastTerminal(`\n> [CRITICAL RISK DETECTED] Action risk is CRITICAL: ${action.risk.message}\n`);
+    // Hard block if targeting protected project core files or banned system commands
+    if (action.risk.message && (action.risk.message.includes('protected project') || action.risk.message.includes('blacklisted/banned'))) {
+      broadcastTerminal(`\n*** [SECURITY HARD BLOCK] Proje çekirdek dosyalarına yetkisiz erişim veya yasaklı işlem algılandı. Eylem engellendi! ***\n`);
+      return { approved: false, feedback: `Güvenlik Engeli: ${action.risk.message}` };
+    }
+  } else if (config.autoApprove && config.autoApprove[action.action]) {
     autoApproved = true;
     broadcastTerminal(`> [AUTO-APPROVED] Action approved automatically by safety settings.\n`);
   }
@@ -133,6 +152,9 @@ async function runAgentLoop() {
   let steps = 0;
   const recentFailedCalls = []; // Track recent failed tool calls to detect infinite retry loops
 
+  // Clear live task step panel for the new task
+  clearTaskSteps();
+
   while (agentState.status === 'thinking' && steps < config.maxSteps) {
     steps++;
     broadcastTerminal(`\n*** [AGENT LOOP STEP ${steps}/${config.maxSteps}] Connecting to LLM... ***\n`);
@@ -144,7 +166,22 @@ async function runAgentLoop() {
     let { dynamicSystemPrompt, activeRole } = await getDynamicSystemPrompt(steps);
     let selectedToolsForLpm = null;
 
-    if (config.lpmMode) {
+    // -----------------------------------------------------------------------
+    // HIGH PARAMETER MODE (HPM) — bypasses LPM/OM batch calls entirely.
+    // For 30B+ models that can reason and select tools in a single pass.
+    // -----------------------------------------------------------------------
+    if (config.hpmMode) {
+      broadcastTerminal(`> [HPM] High Parameter Mode active — LPM/OM bypassed. Single consolidated call.\n`);
+      // Disable Swarm sub-roles in HPM — the large model handles planning itself
+      activeRole = 'Agent';
+      // Inject HPM directive into the system prompt
+      dynamicSystemPrompt += `\n\n[HIGH PARAMETER MODE — SEN YÜK SEK KAPASİTELİ BİR MODELSİN]
+Araç seçimini, planlamayı ve kararı TEK seferde kendin ver. Sana ayrı bir araç seçici veya planlayıcı çağrısı yapılmayacak.
+Mevcut task ve konuşma geçmişini inceleyerek en uygun aracı direkt seç ve JSON formatında döndür.
+Uzun açıklamalar yapma — doğrudan JSON aksiyonunu ver.`;
+    }
+
+    if (!config.hpmMode && config.lpmMode) {
       const { parseSystemPromptTools, getGuidelinesForTool, llmFetch, reconstructSystemPromptForLPM } = require('./llm/llmClient');
       const parsedPrompt = parseSystemPromptTools(config.systemPrompt);
       if (parsedPrompt && parsedPrompt.tools && parsedPrompt.tools.length > 0) {
@@ -154,8 +191,9 @@ async function runAgentLoop() {
         let idealToolIdea = null;
         if (config.lpmOmMode) {
           broadcastTerminal(`> [LPM OM] Querying LLM for ideal tool requirement...\n`);
+          const omSystemPrompt = (config && config.systemPrompts && config.systemPrompts.om_ideal_tool) || 'You are a technical planner. Briefly describe the exact function and capability of the tool you need to complete the next step.';
           const omMessages = [
-            { role: 'system', content: 'You are a technical planner. Briefly describe the exact function and capability of the tool you need to complete the next step.' },
+            { role: 'system', content: omSystemPrompt },
             { role: 'user', content: `Kullanıcıdan sana iletilen nihai isteğe göre ve sana iletilen task'e göre aklında nasıl bir tool kullanmak geçiyor? İsteğe göre nasıl bir tool kullanmak avantajlıdır? Seçmen gereken tool nasıl bir işlevi gerçekleştiriyor olmalı?\n\nTask: ${agentState.task}` }
           ];
           idealToolIdea = await llmFetch(omMessages, config.temperature, 'OM Ideal Tool');
@@ -219,7 +257,7 @@ async function runAgentLoop() {
       }
     }
 
-    if (config.lpmMode && selectedToolsForLpm) {
+    if (!config.hpmMode && config.lpmMode && selectedToolsForLpm) {
       const { parseSystemPromptTools, reconstructSystemPromptForLPM } = require('./llm/llmClient');
       const parsedPrompt = parseSystemPromptTools(config.systemPrompt);
       const rebuiltPromptBase = reconstructSystemPromptForLPM(parsedPrompt, selectedToolsForLpm);
@@ -235,12 +273,12 @@ async function runAgentLoop() {
 
     const requestMessages = await prepareRequestMessages(dynamicSystemPrompt);
     
-    const { assistantText, action } = await fetchAndParseAction(requestMessages);
+    const { assistantText, action, parseTier, latencyMs, retries } = await fetchAndParseAction(requestMessages);
 
     addMessage('assistant', assistantText, config.advancedReasoningMode ? activeRole : null);
 
     if (activeDiscordContext) {
-      let cleanText = assistantText.replace(/\`\`\`json[\s\S]*?\`\`\`/gi, '').trim();
+      let cleanText = assistantText.replace(/```json[\s\S]*?```/gi, '').trim();
       cleanText = cleanText.replace(/<tool[\s\S]*?<\/tool>/gi, '').trim();
       if (cleanText) {
         discordBot.sendChannelMessage(cleanText, null, { hasToolCall: !!action });
@@ -265,18 +303,73 @@ async function runAgentLoop() {
     const userDecision = await requestUserApproval(action, steps);
 
     if (userDecision.approved) {
+      const targetAction = (userDecision && userDecision.action) ? userDecision.action : action;
       agentState.status = 'executing';
       broadcastState();
 
       if (activeDiscordContext) {
-        discordBot.updateDiscordStatus('executing', `Step ${steps}/${config.maxSteps}`, `Executing tool: **${userDecision.action.action}**`, agentState);
+        discordBot.updateDiscordStatus('executing', `Step ${steps}/${config.maxSteps}`, `Executing tool: **${targetAction.action}**`, agentState);
       }
 
-      const targetAction = userDecision.action;
+      // --- Live Task Step: emit START ---
+      const stepId = 'step-' + steps + '-' + Date.now();
+      function getStepLabel(act) {
+        if (act.action === 'execute_command') return act.command ? String(act.command).substring(0, 60) : 'execute_command';
+        if (act.action === 'write_file' || act.action === 'read_file') return act.path ? act.path.split(/[\\/]/).pop() : act.action;
+        if (act.action === 'web_search') return act.query ? '"' + String(act.query).substring(0, 50) + '"' : 'web_search';
+        if (act.action === 'view_website') return act.url ? String(act.url).substring(0, 60) : 'view_website';
+        if (act.action === 'library_mode') return act.search ? '"' + String(act.search).substring(0, 50) + '"' : 'library_mode';
+        return act.action;
+      }
+      const stepEntry = {
+        id: stepId,
+        index: steps,
+        tool: targetAction.action,
+        label: getStepLabel(targetAction),
+        thought: targetAction.explanation ? String(targetAction.explanation).substring(0, 120) : '',
+        status: 'running',
+        startedAt: Date.now(),
+        durationMs: null
+      };
+      agentState.taskSteps.push(stepEntry);
+      broadcastTaskStep(stepEntry);
+      // --- End step START ---
+
       const toolResult = await executeTool(targetAction);
+
+      // --- Live Task Step: emit DONE/ERROR ---
+      stepEntry.durationMs = Date.now() - stepEntry.startedAt;
+      stepEntry.status = (toolResult && toolResult.success !== false) ? 'done' : 'error';
+      broadcastTaskStep(stepEntry);
+      // --- End step DONE/ERROR ---
 
       // Save terminal result print before lastToolOutput overrides
       broadcastTerminal(`[RESULT] ${JSON.stringify(toolResult, null, 2)}\n`);
+
+      // AMPR (Adaptive Model Performance Router) Runtime Telemetry Hook
+      try {
+        const currentModel = await modelManager.getCurrentLoadedModel() || config.modelName || 'local-model';
+        const isToolSuccess = Boolean(toolResult && toolResult.success !== false && !toolResult.tripwireTriggered);
+        performanceTracker.recordExecution({
+          modelId: currentModel,
+          toolName: targetAction.action,
+          parseTier: parseTier || 1,
+          success: isToolSuccess,
+          retriesNeeded: retries || 0,
+          latencyMs: latencyMs || 0
+        });
+      } catch (amprErr) {
+        // AMPR telemetry failure must never disrupt agent loop
+      }
+
+      // Emergency Tripwire Circuit Breaker
+      if (toolResult && toolResult.tripwireTriggered) {
+        broadcastTerminal(`\n*** [ACİL DURUM FRENİ] Tripwire tetiklendi! Ajan sistem tarafından zorla durduruldu! ***\n`);
+        agentState.status = 'failed';
+        addMessage('system', `[ACİL DURUM GÜVENLİK FRENİ] ${toolResult.message}`, config.advancedReasoningMode ? activeRole : null);
+        broadcastState();
+        break;
+      }
 
       if (detectLoop(targetAction, toolResult, recentFailedCalls)) {
         addMessage('system', 'System: Ajan aynı aracı üst üste 3 kez aynı parametrelerle çağırıp başarısız oldu. Sonsuz döngüyü önlemek için görev durduruldu.', config.advancedReasoningMode ? activeRole : null);
@@ -284,6 +377,20 @@ async function runAgentLoop() {
         broadcastState();
         break;
       }
+
+      // --- Otomatik Fallback Model Geçişi (success: false → fallbackTag modeli yükle) ---
+      if (toolResult && toolResult.success === false && config.modelSwitchingEnabled) {
+        try {
+          const { switched, modelId } = await modelManager.switchToFallbackModel(targetAction.action);
+          if (switched && modelId) {
+            broadcastTerminal(`> [MODEL MANAGER] Fallback model aktif: ${modelId}. Ajan bir sonraki adımda bu modeli kullanacak.\n`);
+            addMessage('system', `[MODEL FALLBACK] "${targetAction.action}" tool başarısız oldu. Fallback modele geçildi: ${modelId}`);
+          }
+        } catch (fallbackErr) {
+          broadcastTerminal(`> [MODEL MANAGER] Fallback switch error (non-fatal): ${fallbackErr.message}\n`);
+        }
+      }
+      // --------------------------------------------------------------------------
 
       let imagePath = null;
       if (toolResult && toolResult.success) {
@@ -317,6 +424,15 @@ async function runAgentLoop() {
 
       addMessage('system', `Tool Output:\n\`\`\`json\n${JSON.stringify(toolResult, null, 2)}\n\`\`\``, config.advancedReasoningMode ? activeRole : null, imagePath);
 
+      if (toolResult && toolResult.success === false) {
+        addTransientError(`[${targetAction.action}] ${toolResult.message || toolResult.error || 'Tool execution failed'}`);
+      }
+
+      // --- Checkpoint: Başarılı her adım sonrası durumu kaydet ---
+      if (toolResult && toolResult.success !== false && targetAction.action !== 'task_complete') {
+        saveCheckpoint(agentState, steps, config);
+      }
+
       if (config.advancedReasoningMode && agentState.planSteps.length > 0 && toolResult.success !== false) {
         const nonAdvancingActions = ['select_guide', 'task_complete'];
         if (!nonAdvancingActions.includes(targetAction.action)) {
@@ -333,6 +449,13 @@ async function runAgentLoop() {
       if (targetAction.action === 'task_complete') {
         agentState.status = 'completed';
         broadcastState();
+        // Görev bitti: checkpoint'i temizle ve kullanıcıya bildirim gönder
+        deleteCheckpoint();
+        sendSystemNotification(
+          'Görev Tamamlandı ✅',
+          `Stellarigent: "${String(agentState.task || '').substring(0, 80)}" görevi başarıyla tamamlandı.`,
+          'info'
+        ).catch(() => {});
         break;
       }
 
@@ -343,6 +466,7 @@ async function runAgentLoop() {
 
     } else {
       broadcastTerminal(`[REJECTED] Action rejected by user. Feedback: "${userDecision.feedback || 'No comments'}"\n`);
+      addTransientError(`[USER_REJECTION] ${targetAction.action}: ${userDecision.feedback || 'No comments'}`);
       
       // --- Rejection Analysis Sub-loop ---
       broadcastTerminal(`> [ANALYSIS] Starting self-analysis based on rejection feedback...\n`);
@@ -353,7 +477,7 @@ async function runAgentLoop() {
                             : 'No tools executed yet';
       const feedback = userDecision.feedback || 'No specific reason provided';
       
-      const analysisSystemPrompt = `You are a strict QA and debugging AI. Your task is to analyze why the previous AI agent failed and was rejected by the user.
+      const analysisSystemPrompt = (config.systemPrompts && config.systemPrompts.qa_analysis) || `You are a strict QA and debugging AI. Your task is to analyze why the previous AI agent failed and was rejected by the user.
 You will be provided with:
 1. The user's initial request.
 2. The tools/actions the agent has executed so far.
@@ -377,6 +501,49 @@ Analyze the failure and provide instructions for correction.`;
         
         // Append analysis to agent's memory
         addMessage('system', `[REJECTION ANALYSIS & CORRECTION PLAN]\nThe user rejected your last action. Reason: "${feedback}".\n\nSelf-Correction Plan:\n${analysisResult}\n\nFollow this plan immediately.`, config.advancedReasoningMode ? activeRole : null);
+
+        // --- Distill Security/Persistent Rule (Pending User Review) ---
+        try {
+          const rulePrompt = `Kullanıcı şu eylemi reddetti:
+Eylem: ${JSON.stringify(targetAction)}
+Gerekçe: "${feedback}"
+
+Soru: Kullanıcının bu eylemi reddetmesi kalıcı ve genel bir GÜVENLİK KURALI veya ASLA YAPILMAMASI GEREKEN BİR KURAL (Örn: "Projedeki .env dosyasını silme", "Kullanıcı onayı olmadan açık portları kapatma") gerektirir mi?
+Yoksa sadece o ana özgü geçici bir fikir değişikliği/tercih midir?
+
+Eğer genel ve kritik bir kural gerektiriyorsa JSON formatında:
+{"isSecurityRule": true, "rule": "Net, emir kipinde kısa kural cümlesi", "category": "SECURITY_VIOLATION"}
+Eğer geçici bir tercihse veya genel kural gerekmiyorsa:
+{"isSecurityRule": false}
+SADECE GEÇERLİ JSON DÖNDÜR.`;
+
+          const ruleRes = await llmFetch([
+            { role: 'system', content: 'Sen sadece JSON döndüren güvenlik kuralı analizcisisin.' },
+            { role: 'user', content: rulePrompt }
+          ], 0.1, 'Rule Distillation');
+
+          let parsedRule = null;
+          try {
+            const cleanJson = ruleRes.replace(/```json|```/gi, '').trim();
+            parsedRule = JSON.parse(cleanJson);
+          } catch {}
+
+          if (parsedRule && parsedRule.isSecurityRule && parsedRule.rule) {
+            const newPending = await addPendingRule({
+              rule: parsedRule.rule,
+              category: parsedRule.category || 'SECURITY_VIOLATION',
+              context: feedback,
+              exceptions: Array.isArray(parsedRule.exceptions) ? parsedRule.exceptions : []
+            });
+            broadcastTerminal(`\n> [SAFETY RULE PROPOSED] Yeni güvenlik kuralı önerildi (Onay bekliyor): "${parsedRule.rule}"\n`);
+            addMessage('system', `[YENİ GÜVENLİK KURALI ÖNERİSİ]\n"${parsedRule.rule}"\n(Bu kural ayarlar ekranında veya Discord üzerinden onayınızı beklemektedir).`);
+            if (discordBot && discordBot.sendPendingRuleProposal && newPending) {
+              discordBot.sendPendingRuleProposal(newPending);
+            }
+          }
+        } catch (ruleDistillErr) {
+          console.error('[RULE DISTILL ERROR]', ruleDistillErr);
+        }
       } catch (err) {
         broadcastTerminal(`> [ANALYSIS ERROR] Failed to run rejection analysis: ${err.message}\n`);
         addMessage('system', `Action rejected by user. Feedback: ${feedback}`, config.advancedReasoningMode ? activeRole : null);
@@ -396,6 +563,13 @@ Analyze the failure and provide instructions for correction.`;
     addMessage('system', 'System Limit: Task stopped because it exceeded the maximum allowed iterations.', config.advancedReasoningMode ? 'Tester' : null);
     agentState.status = 'failed';
     broadcastState();
+    // Başarısız / limit aşıldı: checkpoint'i temizle ve kullanıcıya hata bildirimi gönder
+    deleteCheckpoint();
+    sendSystemNotification(
+      'Görev Başarısız ❌',
+      `Stellarigent: "${String(agentState.task || '').substring(0, 80)}" görevi maksimum adım sayısına ulaşıp durduruldu.`,
+      'warning'
+    ).catch(() => {});
   }
 
   if (activeDiscordContext) {
@@ -410,7 +584,7 @@ async function initializeTaskContextAndSelectMode(userTask) {
   if (!fs.existsSync(readmePath)) {
     const { getFolderStructureSummary } = require('./memory');
     const folderStructure = await getFolderStructureSummary(agentState.cwd);
-    await fs.promises.writeFile(readmePath, `# Local AI Agent Project Workspace\n\n## Directory Structure\n\`\`\`\n${folderStructure}\n\`\`\`\n\n## What I Accomplished & Learned\n- Initialized repository.\n`, 'utf-8');
+    await fs.promises.writeFile(readmePath, `# Stellarigent Project Workspace\n\n## Directory Structure\n\`\`\`\n${folderStructure}\n\`\`\`\n\n## What I Accomplished & Learned\n- Initialized repository.\n`, 'utf-8');
   }
   const readmeContent = await fs.promises.readFile(readmePath, 'utf-8');
 
@@ -450,6 +624,7 @@ async function initializeTaskContextAndSelectMode(userTask) {
   agentState.selectedGuides = [];
   agentState.executedTools = [];
   agentState.thoughts = [];
+  agentState.hasReadAgentUserJson = false; // Reset tripwire for new task
   broadcastState();
 
   addMessage('system', `[INITIALIZATION] Geçmiş çalışma belleği (agent_readme.md) okundu ve filtrelendi.`);
@@ -574,6 +749,11 @@ async function handleDiscordAgentAction(action, updateCallback) {
     action.risk = risk;
     action.id = 'act-discord-' + Date.now();
 
+    if (risk.level === 'CRITICAL' && risk.message && (risk.message.includes('protected project') || risk.message.includes('blacklisted/banned'))) {
+      broadcastTerminal(`\n*** [SECURITY HARD BLOCK] Discord üzerinden proje çekirdek dosyalarına müdahale veya yasaklı işlem algılandı. Eylem engellendi! ***\n`);
+      return resolve({ success: false, message: `Güvenlik Engeli: ${risk.message}` });
+    }
+
     updateCallback({ status: 'pending_approval', log: 'Awaiting Web UI approval...' });
 
     agentState.status = 'pending_approval';
@@ -642,7 +822,7 @@ async function initializeIdeTaskContext(userTask) {
   // Step 1: Planner Summary
   const modeRules = getPlannerModeRules(agentState);
   const plannerMessages = [
-    { role: 'system', content: IDE_PLANNER_PROMPT + modeRules },
+    { role: 'system', content: getIdePlannerPrompt() + modeRules },
     { role: 'user', content: `Kullanıcı İsteği:\n${userTask}` }
   ];
   const plannerSummary = await llmFetch(plannerMessages, 0.2, 'IDE Planner');
@@ -655,8 +835,10 @@ async function initializeIdeTaskContext(userTask) {
   const { dynamicSystemPrompt } = await getDynamicSystemPrompt(1);
   config.forceTaskPlan = originalForce;
 
+  const defaultConverter = 'Sen bir görev planlayıcısın (Task Planner). Aşağıdaki metin planını kullanarak ZORUNLU olarak \'task_plan\' aracını çağırıp, bu metindeki adımları JSON formatında bir görev listesine (checklist) çevirmelisin. Sadece task_plan aracını kullan.';
+  const taskConverterPrompt = (config && config.systemPrompts && config.systemPrompts.task_plan_converter) || defaultConverter;
   const taskListMessages = [
-    { role: 'system', content: `Sen bir görev planlayıcısın (Task Planner). Aşağıdaki metin planını kullanarak ZORUNLU olarak 'task_plan' aracını çağırıp, bu metindeki adımları JSON formatında bir görev listesine (checklist) çevirmelisin. Sadece task_plan aracını kullan.\n\n${dynamicSystemPrompt}` },
+    { role: 'system', content: `${taskConverterPrompt}\n\n${dynamicSystemPrompt}` },
     { role: 'user', content: `İşte plan:\n${plannerSummary}` }
   ];
 
@@ -701,13 +883,7 @@ async function runIdeSwarmLoop() {
       const completedSteps = agentState.planSteps.filter(s => s.status === 'completed').map(s => s.text);
       
       const plannerMsgs = [
-        { role: 'system', content: `Sen uzman bir yazılım mimarısın. 
-Kullanıcı işin ortasında yeni bir istek girdi. 
-Şu ana kadar tamamlanan görevler: ${JSON.stringify(completedSteps)}
-Kullanıcının yeni/ek isteği: ${interruptTask}
-
-Şimdi, tamamlananları dikkate alarak KALINAN YERDEN veya YENİ İSTEĞE GÖRE geri kalan sürecin adım adım düz metin planını oluştur.
-KESİNLİKLE JSON KULLANMA. KESİNLİKLE KOD YAZMA.` + getPlannerModeRules(agentState) },
+        { role: 'system', content: getIdePlannerPrompt() + getPlannerModeRules(agentState) },
         { role: 'user', content: 'Lütfen güncel adımları yaz.' }
       ];
       const plannerSummary = await llmFetch(plannerMsgs, 0.2, 'IDE Planner Interrupted');
@@ -719,7 +895,7 @@ KESİNLİKLE JSON KULLANMA. KESİNLİKLE KOD YAZMA.` + getPlannerModeRules(agent
       config.forceTaskPlan = originalForce;
 
       const taskListMessages = [
-        { role: 'system', content: `Sen bir görev planlayıcısın. Aşağıdaki metni 'task_plan' aracıyla JSON formatında görev listesine çevir.\n\n${dynamicSystemPrompt}` },
+        { role: 'system', content: `${taskConverterPrompt}\n\n${dynamicSystemPrompt}` },
         { role: 'user', content: `İşte plan:\n${plannerSummary}` }
       ];
       
@@ -821,6 +997,14 @@ Bu görevi tamamlamak için uygun bir araç (tool) çağır. Sadece tek bir ara�
         // Save terminal result print before overrides
         broadcastTerminal(`[RESULT] ${JSON.stringify(toolResult, null, 2)}\n`);
 
+        if (toolResult && toolResult.tripwireTriggered) {
+          broadcastTerminal(`\n*** [ACİL DURUM FRENİ] Tripwire tetiklendi! Swarm Developer döngüsü durduruldu! ***\n`);
+          agentState.status = 'failed';
+          addMessage('system', `[ACİL DURUM GÜVENLİK FRENİ] ${toolResult.message}`, 'Developer');
+          broadcastState();
+          break;
+        }
+
         if (targetAction.action === 'library_mode') {
           const { runLibraryModeSubLoop } = require('./modes/libraryMode');
           const libraryResults = await runLibraryModeSubLoop(targetAction.search, targetAction.explanation);
@@ -851,7 +1035,7 @@ Bu görevi tamamlamak için uygun bir araç (tool) çağır. Sadece tek bir ara�
     // Call Checker
     broadcastTerminal(`\n*** [IDE SWARM] Checker Ajan kontrol ediyor... ***\n`);
     const checkerMessages = [
-      { role: 'system', content: IDE_CHECKER_PROMPT },
+      { role: 'system', content: getIdeCheckerPrompt() },
       { role: 'user', content: `Tüm Proje Hedefi: ${agentState.task}\n\nTüm Görev Listesi: ${JSON.stringify(agentState.planSteps)}\n\nŞu anki Görev: ${currentTask}\n\nÇalıştırılan Aracın Çıktısı (veya son durum): ${agentState.lastToolOutput}` }
     ];
     
@@ -892,6 +1076,233 @@ Bu görevi tamamlamak için uygun bir araç (tool) çağır. Sadece tek bir ara�
   }
 }
 
+/**
+ * Executes a single direct manual tool call without entering IDE Planner / Task List loops.
+ * Specifically for sidebar "Manuel Tools" (CMD/PS, File Reader, File Writer, etc.)
+ */
+async function runManuelTool(userTask) {
+  try {
+    agentState.task = userTask;
+    agentState.status = 'thinking';
+    agentState.messages = [];
+    agentState.planSteps = [];
+    agentState.executedTools = [];
+    agentState.thoughts = [];
+    agentState.ideInterrupted = null;
+    config.forceTaskPlan = false;
+    broadcastState();
+
+    const sub = agentState.activeSubMode || 'none';
+    let targetAction = sub;
+    if (sub === 'cmd_tool') targetAction = 'execute_command';
+    else if (sub === 'app_tool') targetAction = 'open_application';
+    else if (sub === 'web_search') targetAction = 'web_search';
+    else if (sub === 'file_reader') targetAction = 'read_file';
+    else if (sub === 'file_writer') targetAction = 'write_file';
+    else if (sub === 'dir_lister') targetAction = 'list_directory';
+    else if (sub === 'task_lister') targetAction = 'task_plan';
+    else if (sub === 'guide_selector') targetAction = 'select_guide';
+    else if (sub === 'url_image') targetAction = 'url_image_reader';
+    else if (sub === 'finance_tool') targetAction = 'extract_chart_data';
+
+    broadcastTerminal(`\n*** [MANUEL TOOL] '${sub}' (${targetAction}) doğrudan çalıştırılıyor... ***\n`);
+    addMessage('user', userTask);
+
+    let { dynamicSystemPrompt } = await getDynamicSystemPrompt(1);
+
+    if (config.hpmMode) {
+      dynamicSystemPrompt += `\n\n[HIGH PARAMETER MODE — SEN YÜKSEK KAPASİTELİ BİR MODELSİN]
+Mevcut isteği tek seferde yerine getirecek aracı seç ve doğrudan JSON formatında döndür. Uzun açıklamalar yapma, doğrudan JSON aksiyonunu ver.`;
+    }
+
+    dynamicSystemPrompt += `\n\n[MANUEL TOOL - DOĞRUDAN ÇALIŞTIRMA TALİMATI]
+Sen şu anda tek bir işlem için doğrudan araç (tool) çağırma modundasın.
+ASLA plan yapma, görev listesi oluşturma veya 'task_plan' kullanma.
+Kullanıcının isteğini yerine getirmek için doğrudan '${targetAction}' JSON araç çağrısı üret.
+Gereksiz konuşma yapma, sadece geçerli bir JSON blok içinde aracı çağır.`;
+
+    if (targetAction === 'execute_command') {
+      dynamicSystemPrompt += `\n\n[KOMUT VE ÇALIŞMA ALANI REHBERİ]:
+- Bu sistem WINDOWS işletim sistemindedir ve PowerShell kullanır.
+- 'scratch' klasöründeki dosyaları listelemek için doğrudan 'Get-ChildItem scratch' komutunu çalıştır.
+- KESİNLİKLE '||' veya '&&' zincirleme sembolleri kullanma. Tek bir net komut çalıştır.
+- Asla 'C:\\scratch' gibi varsayımsal sabit sürücü harfleri uydurma. Proje kök dizinindeki 'scratch' klasörünü hedefle.`;
+    } else if (targetAction === 'read_file' || targetAction === 'write_file' || targetAction === 'list_directory') {
+      dynamicSystemPrompt += `\n\n[DOSYA VE DİZİN YOLU REHBERİ]:
+- Dosya ve dizin araçlarında her zaman göreceli yol kullan (Örnek: "scratch/test.txt", "By_Agent/rapor.md" veya "scratch").
+- Asla 'C:\\scratch' gibi varsayımsal sabit sürücü harfleri kullanma.`;
+    }
+
+    const requestMessages = await prepareRequestMessages(dynamicSystemPrompt);
+    const { assistantText, action } = await fetchAndParseAction(requestMessages);
+    addMessage('assistant', assistantText, 'Manuel Tool');
+
+    if (!action) {
+      broadcastTerminal(`> [MANUEL TOOL] Model herhangi bir araç çağırmadı, doğrudan metin yanıtı verdi.\n`);
+      agentState.status = 'completed';
+      broadcastState();
+      return;
+    }
+
+    recordActionThoughts(assistantText, action);
+
+    const risk = assessActionRisk(action);
+    action.risk = risk;
+    action.id = 'act-' + Date.now();
+
+    broadcastTerminal(`\n[MANUEL TOOL] Önerilen Araç: ${action.action}\nAçıklama: ${action.explanation || 'Yok'}\nRisk Seviyesi: ${risk.level}\n`);
+
+    const userDecision = await requestUserApproval(action, 1);
+
+    if (userDecision.approved) {
+      agentState.status = 'executing';
+      broadcastState();
+
+      if (activeDiscordContext) {
+        discordBot.updateDiscordStatus('executing', '1/1', `Executing tool: **${userDecision.action.action}**`, agentState);
+      }
+
+      const toolResult = await executeTool(userDecision.action);
+      broadcastTerminal(`[RESULT] ${JSON.stringify(toolResult, null, 2)}\n`);
+
+      addMessage('system', `[Araç Çıktısı (${userDecision.action.action})]:\n${typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult, null, 2)}`);
+
+      // Kısa bir sonuç özeti üret
+      broadcastTerminal(`> [MANUEL TOOL] İşlem sonucu kullanıcıya özetleniyor...\n`);
+      const reportMessages = [
+        { role: 'system', content: 'Sen yardımsever bir yapay zeka asistanısın. Kullanıcı bir araç çalıştırdı ve çıktısı sistem mesajında yer alıyor. Sonucu kullanıcıya kısa, net ve anlaşılır şekilde açıkla. Kesinlikle başka bir araç çağırma.' },
+        ...agentState.messages.map(m => ({
+          role: m.role === 'system' ? 'user' : m.role,
+          content: m.content
+        })),
+        { role: 'user', content: 'Lütfen yukarıdaki araç çıktısını kullanıcıya açıkla/bildir.' }
+      ];
+
+      const summaryText = await llmFetch(reportMessages, 0.3, 'Manuel Tool Report');
+      addMessage('assistant', summaryText, 'Manuel Tool');
+
+      agentState.status = 'completed';
+      broadcastState();
+      broadcastTerminal(`\n*** [MANUEL TOOL] İşlem başarıyla tamamlandı! ***\n`);
+    } else {
+      broadcastTerminal(`> [MANUEL TOOL] İşlem kullanıcı tarafından reddedildi.\n`);
+      addMessage('system', `İşlem kullanıcı tarafından reddedildi: ${userDecision.feedback || 'Kullanıcı onay vermedi.'}`);
+      agentState.status = 'completed';
+      broadcastState();
+    }
+  } catch (err) {
+    console.error("Manuel tool error:", err);
+    broadcastTerminal(`> [ERROR] Manuel tool işlemi başarısız: ${err.message}\n`);
+    addMessage('system', `[HATA] ${err.message}`);
+    agentState.status = 'idle';
+    broadcastState();
+  }
+}
+
+/**
+ * Research modu (Web, Local, Deep Web) için doğrudan araştırma çalıştırıcısı.
+ * Kesinlikle IDE Task Plan veya Swarm Planlama yapmaz.
+ * Doğrudan ilgili araştırma aracını çağırıp çıktısını kullanıcıya açıklar.
+ */
+async function runResearchTool(userTask) {
+  try {
+    agentState.status = 'thinking';
+    agentState.messages = [];
+    agentState.planSteps = [];
+    agentState.executedTools = [];
+    agentState.thoughts = [];
+    agentState.ideInterrupted = null;
+    config.forceTaskPlan = false;
+    broadcastState();
+
+    const sub = agentState.activeSubMode || 'web';
+    let targetTool = 'web_search';
+    if (sub === 'local') targetTool = 'read_file';
+    else if (sub === 'web') targetTool = 'web_search';
+    else if (sub === 'deep_web') targetTool = 'deep_web_search';
+
+    broadcastTerminal(`\n*** [RESEARCH] '${sub}' araştırması doğrudan başlatılıyor (Planlama devre dışı)... ***\n`);
+    addMessage('user', userTask);
+
+    let { dynamicSystemPrompt } = await getDynamicSystemPrompt(1);
+
+    if (config.hpmMode) {
+      dynamicSystemPrompt += `\n\n[HIGH PARAMETER MODE — SEN YÜKSEK KAPASİTELİ BİR MODELSİN]
+Mevcut araştırma isteğini tek seferde yerine getirecek aracı seç ve doğrudan JSON formatında döndür. Uzun açıklamalar yapma, doğrudan JSON aksiyonunu ver.`;
+    }
+
+    dynamicSystemPrompt += `\n\n[RESEARCH MODE - DOĞRUDAN ARAŞTIRMA TALİMATI]
+Sen şu anda doğrudan Araştırma (Research) modundasın.
+ASLA kod yazma, index.html/style.css gibi yazılım projeleri kurma.
+ASLA görev planı (task plan), checklist veya 'task_plan' aracı kullanma.
+Kullanıcının araştırma isteğini yerine getirmek için doğrudan '${targetTool}' veya ilgili araştırma araçlarını çağır.
+Eğer aradığın bilgi elindeyse doğrudan detaylı ve açıklayıcı Türkçe metin yanıtı ver.`;
+
+    const requestMessages = await prepareRequestMessages(dynamicSystemPrompt);
+    const { assistantText, action } = await fetchAndParseAction(requestMessages);
+    addMessage('assistant', assistantText, 'Research Agent');
+
+    if (!action) {
+      broadcastTerminal(`> [RESEARCH] Model doğrudan metin yanıtı verdi, ek araç çağırmadı.\n`);
+      agentState.status = 'completed';
+      broadcastState();
+      return;
+    }
+
+    recordActionThoughts(assistantText, action);
+
+    const risk = assessActionRisk(action);
+    action.risk = risk;
+    action.id = 'act-' + Date.now();
+
+    broadcastTerminal(`\n[RESEARCH TOOL] Önerilen Araç: ${action.action}\nAçıklama: ${action.explanation || 'Yok'}\nRisk Seviyesi: ${risk.level}\n`);
+
+    const userDecision = await requestUserApproval(action, 1);
+
+    if (userDecision.approved) {
+      agentState.status = 'executing';
+      broadcastState();
+
+      if (activeDiscordContext) {
+        discordBot.updateDiscordStatus('executing', '1/1', `Executing research: **${userDecision.action.action}**`, agentState);
+      }
+
+      const toolResult = await executeTool(userDecision.action);
+      broadcastTerminal(`[RESULT] ${JSON.stringify(toolResult, null, 2)}\n`);
+
+      addMessage('system', `[Araştırma Çıktısı (${userDecision.action.action})]:\n${typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult, null, 2)}`);
+
+      broadcastTerminal(`> [RESEARCH] Araştırma sonucu kullanıcıya raporlanıyor...\n`);
+      const reportMessages = [
+        { role: 'system', content: 'Sen araştırmacı bir yapay zekasın. Yukarıda çalıştırılan araştırma aracının çıktısını inceleyerek kullanıcının sorusuna kapsamlı, net ve açıklayıcı bir Türkçe cevap hazırla. Kesinlikle başka bir araç çağırma.' },
+        ...agentState.messages.map(m => ({
+          role: m.role === 'system' ? 'user' : m.role,
+          content: m.content
+        })),
+        { role: 'user', content: 'Lütfen yukarıdaki araştırma çıktısına dayanarak kapsamlı bir yanıt sun.' }
+      ];
+
+      const summaryText = await llmFetch(reportMessages, 0.3, 'Research Report');
+      addMessage('assistant', summaryText, 'Research Agent');
+
+      agentState.status = 'completed';
+      broadcastState();
+      broadcastTerminal(`\n*** [RESEARCH] Araştırma başarıyla tamamlandı! ***\n`);
+    } else {
+      broadcastTerminal(`> [RESEARCH] Araştırma kullanıcı tarafından reddedildi.\n`);
+      addMessage('system', `İşlem kullanıcı tarafından reddedildi: ${userDecision.feedback || 'Kullanıcı onay vermedi.'}`);
+      agentState.status = 'completed';
+      broadcastState();
+    }
+  } catch (err) {
+    console.error("Research tool error:", err);
+    broadcastTerminal(`> [ERROR] Araştırma işlemi başarısız: ${err.message}\n`);
+    addMessage('system', `[HATA] ${err.message}`);
+    agentState.status = 'idle';
+    broadcastState();
+  }
+}
+
 module.exports = {
   runAgentLoop,
   initializeTaskContextAndSelectMode,
@@ -900,7 +1311,9 @@ module.exports = {
   getPendingAction,
   resolvePendingAction,
   initializeIdeTaskContext,
-  runIdeSwarmLoop
+  runIdeSwarmLoop,
+  runManuelTool,
+  runResearchTool
 };
 
 

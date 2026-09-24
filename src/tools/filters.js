@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { agentState, broadcastTerminal } = require('../state');
 const { getSandboxPath } = require('./filesystem');
-const { checkAndRegisterPath } = require('../security');
+const { checkAndRegisterPath, isProtectedProjectFile, checkTripwire } = require('../security');
 
 function filterOutput(query, filterType) {
   const content = agentState.lastToolOutput || '';
@@ -42,14 +42,19 @@ function filterOutput(query, filterType) {
 }
 
 async function lineChecker(filePath, query) {
-  const targetPath = path.resolve(agentState.cwd, filePath);
-  const sandboxPath = getSandboxPath(targetPath);
-  broadcastTerminal(`> [LINE CHECKER] Sandbox: ${sandboxPath} (Real: ${targetPath}) | Query: "${query}"\n`);
-  
-  if (!checkAndRegisterPath(filePath, true)) {
+  const tripwireStatus = checkTripwire(filePath);
+  if (tripwireStatus.tripwireTriggered) {
+    return { success: false, tripwireTriggered: true, message: tripwireStatus.message };
+  }
+
+  if (!filePath || isProtectedProjectFile(filePath) || !checkAndRegisterPath(filePath, false)) {
     broadcastTerminal(`> [BLOCKED] Access to path is restricted: ${filePath}\n`);
     return { success: false, message: "Dosya erişimi güvenlik politikası nedeniyle engellendi." };
   }
+
+  const targetPath = path.resolve(agentState.cwd, filePath);
+  const sandboxPath = getSandboxPath(targetPath);
+  broadcastTerminal(`> [LINE CHECKER] Sandbox: ${sandboxPath} (Real: ${targetPath}) | Query: "${query}"\n`);
   
   try {
     let finalPathToRead = targetPath;

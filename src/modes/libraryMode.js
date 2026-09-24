@@ -59,6 +59,7 @@ async function runLibraryModeSubLoop(searchQuery, explanation) {
 
   // Pre-filter files using light local keyword matcher to find top candidates
   let candidateFiles = [...files];
+  let matchedCandidates = [];
   const queryTokens = searchQuery.toLowerCase().split(/[^a-zA-Z0-9çığöşüöäüæßàáâäæãåā]+/g).filter(w => w.length > 1);
   const librariesRoot = path.join(agentState.cwd, 'Libraries');
   // Check if user wants to see ALL files (broad queries)
@@ -89,9 +90,9 @@ async function runLibraryModeSubLoop(searchQuery, explanation) {
       return { fileName: relPath, score };
     }));
 
-    const matched = scored.filter(s => s.score > 0).sort((a, b) => b.score - a.score);
-    if (matched.length > 0) {
-      candidateFiles = matched.slice(0, 30).map(s => s.fileName);
+    matchedCandidates = scored.filter(s => s.score > 0).sort((a, b) => b.score - a.score);
+    if (matchedCandidates.length > 0) {
+      candidateFiles = matchedCandidates.slice(0, 30).map(s => s.fileName);
       broadcastTerminal(`> [LIBRARY PRE-FILTER] Keyword match: ${files.length} → ${candidateFiles.length} aday dosya bulundu.\n`);
       addMessage('system', `[LIBRARY PRE-FILTER] ${files.length} dosya arasından ${candidateFiles.length} aday filtrelendi.`);
     } else {
@@ -125,10 +126,12 @@ Eğer bu listede aradığın bilgiyle ilişkili hiçbir dosya yoksa, sadece "no"
 
     let repliedText = '';
     try {
+      const { config } = require('../state');
+      const docSelPrompt = (config && config.systemPrompts && config.systemPrompts.library_doc_selector) || 'You are a precise document selector. Answer exactly according to the requested format.';
       repliedText = await llmFetch([
-        { role: 'system', content: 'You are a precise document selector. Answer exactly according to the requested format.' },
+        { role: 'system', content: docSelPrompt },
         { role: 'user', content: promptContent }
-      ], 0.1, 'Library File Selection');
+      ], 0.1, 'Library File Selection', 3, 'library_mode');
       repliedText = repliedText.trim();
     } catch (err) {
       console.error("Sub-loop batch fetch failed:", err);
@@ -138,10 +141,44 @@ Eğer bu listede aradığın bilgiyle ilişkili hiçbir dosya yoksa, sadece "no"
     addMessage('system', `[LIBRARY SELECTION BATCH] Seçilen dosyalar: "${repliedText.replace(/\n/g, ' ')}"`);
 
     if (repliedText && repliedText.toLowerCase() !== 'no' && repliedText.toLowerCase() !== 'hayır') {
-      const chosen = repliedText.split(',').map(s => s.trim()).filter(s => chunk.includes(s));
+      const chosen = [];
+      repliedText.split(',').forEach(raw => {
+        let clean = raw.trim().replace(/^[\d\.\-\*\s]+/, '').trim();
+        if (!clean) return;
+        const match = chunk.find(c => {
+          const cNorm = c.replace(/\\/g, '/').toLowerCase();
+          const cleanNorm = clean.replace(/\\/g, '/').toLowerCase();
+          const normTr = s => (s || '')
+            .replace(/ğ/g, 'g').replace(/Ğ/g, 'g')
+            .replace(/ü/g, 'u').replace(/Ü/g, 'u')
+            .replace(/ş/g, 's').replace(/Ş/g, 's')
+            .replace(/ı/g, 'i').replace(/İ/g, 'i')
+            .replace(/ö/g, 'o').replace(/Ö/g, 'o')
+            .replace(/ç/g, 'c').replace(/Ç/g, 'c')
+            .toLowerCase();
+          const cBase = normTr(path.basename(c, path.extname(c)).replace(/_/g, ' '));
+          const cleanBase = normTr(cleanNorm.replace(/\.json|\.md|\.txt/g, '').replace(/_/g, ' '));
+          return cNorm === cleanNorm ||
+                 path.basename(c).toLowerCase() === path.basename(clean).toLowerCase() ||
+                 cNorm.includes(cleanNorm) ||
+                 cBase === cleanBase ||
+                 cBase.includes(cleanBase) ||
+                 cleanBase.includes(cBase);
+        });
+        if (match && !chosen.includes(match)) {
+          chosen.push(match);
+        }
+      });
       selectedFiles.push(...chosen);
       broadcastTerminal(`> Selected files in this batch: ${chosen.join(', ')}\n`);
     }
+  }
+
+  // Fallback: If selector returned "no" or empty, but content score matched high keywords
+  if (selectedFiles.length === 0 && matchedCandidates.length > 0 && matchedCandidates[0].score >= 5) {
+    const topScored = matchedCandidates.filter(m => m.score >= 5).slice(0, 5).map(m => m.fileName);
+    selectedFiles.push(...topScored);
+    broadcastTerminal(`> [LIBRARY SELECTION FALLBACK] Top scored files selected for verification: ${topScored.join(', ')}\n`);
   }
 
   const acceptedFiles = [];
@@ -171,7 +208,7 @@ Eğer eklenmesini istiyorsan sadece "evet" veya "yes" veya "true" yaz.
       const raw = await llmFetch([
         { role: 'system', content: 'Answer only yes or no.' },
         { role: 'user', content: promptCheck }
-      ], 0.1, 'Library File Verification');
+      ], 0.1, 'Library File Verification', 3, 'library_mode');
       checkReply = raw.trim().toLowerCase();
     } catch (err) {
       console.error("Content verification fetch failed:", err);
@@ -183,6 +220,48 @@ Eğer eklenmesini istiyorsan sadece "evet" veya "yes" veya "true" yaz.
 
     if (isYes) {
       acceptedFiles.push({ name: fileName, content: fileContent });
+    }
+  }
+
+  // Stage 2 Verification Fallback: If initial selection yielded 0 accepted files,
+  // verify top keyword-matched candidates (score >= 10) directly through content verification.
+  if (acceptedFiles.length === 0 && matchedCandidates && matchedCandidates.length > 0) {
+    const unverifiedHighScored = matchedCandidates.filter(m => m.score >= 10 && !selectedFiles.includes(m.fileName)).slice(0, 3);
+    for (const cand of unverifiedHighScored) {
+      const filePath = path.join(agentState.cwd, cand.fileName);
+      let fileContent = '';
+      try {
+        fileContent = await fs.promises.readFile(filePath, 'utf-8');
+      } catch {
+        continue;
+      }
+      const promptCheck = `Seçilen Dosya: "${cand.fileName}"
+İçerik:
+"""
+${fileContent}
+"""
+
+Aranan Bilgi: "${searchQuery}"
+
+Bu dosyanın içeriği aradığın bilgi ile eşleşiyor mu ve asıl hafızaya eklenmesini istiyor musun?
+Eğer eklenmesini istiyorsan sadece "evet" veya "yes" veya "true" yaz.
+İstemiyorsan sadece "hayır" veya "no" veya "false" yaz. Başka hiçbir şey yazma.`;
+
+      let checkReply = '';
+      try {
+        const raw = await llmFetch([
+          { role: 'system', content: 'Answer only yes or no.' },
+          { role: 'user', content: promptCheck }
+        ], 0.1, 'Library File Verification Fallback', 3, 'library_mode');
+        checkReply = raw.trim().toLowerCase();
+      } catch (err) {}
+
+      const isYes = checkReply.includes('evet') || checkReply.includes('yes') || checkReply.includes('true');
+      broadcastTerminal(`> [VERIFICATION FALLBACK] "${cand.fileName}": "${checkReply}" -> ${isYes ? 'ACCEPTED' : 'REJECTED'}\n`);
+      if (isYes) {
+        acceptedFiles.push({ name: cand.fileName, content: fileContent });
+        break;
+      }
     }
   }
 
@@ -212,11 +291,15 @@ Eğer eklenmesini istiyorsan sadece "evet" veya "yes" veya "true" yaz.
 const SGM_MAX_STEPS = 15;
 
 async function sgmHealthCheck(prompt, summaries, stepCount) {
-  const { broadcastTerminal } = require('../state');
+  const { config, broadcastTerminal } = require('../state');
   broadcastTerminal(`> [SGM HEALTH CHECK] ${stepCount} adim tamamlandi. Gorev durumu kontrol ediliyor...\n`);
-  const checkPrompt = `Sen bir gorev denetcisisin. Bir ajan asagidaki kullanici istegini yerine getirmeye calisiyor ve ${stepCount} adim atti.\n\nKullanici Istegi: "${prompt}"\n\nSimdiye kadar yapilanlar (ozet gecmis):\n${summaries.join('\n')}\n\nAnaliz Et:\n1. Kullanicinin istegi tam olarak karsilandi mi?\n2. Ajan takildi veya donguye girdi mi?\n3. Bir hata ya da tutarsizlik var mi?\n\nKarar ver. SADECE asagidaki JSON formatinda cevap ver:\n{\n  "karar": "DEVAM_ET" | "BITIR" | "HATA",\n  "neden": "Kararin kisa gerekcesi (1-2 cumle)",\n  "tavsiye": "DEVAM_ET ise ajana siradaki adim icin ipucu ver. BITIR ise ne tamamlandigini yaz. HATA ise kullaniciya bildirilecek mesaji yaz."\n}`;
+  const defaultCheckPrompt = `Sen bir gorev denetcisisin. Bir ajan asagidaki kullanici istegini yerine getirmeye calisiyor ve ${stepCount} adim atti.\n\nKullanici Istegi: "${prompt}"\n\nSimdiye kadar yapilanlar (ozet gecmis):\n${summaries.join('\n')}\n\nAnaliz Et:\n1. Kullanicinin istegi tam olarak karsilandi mi?\n2. Ajan takildi veya donguye girdi mi?\n3. Bir hata ya da tutarsizlik var mi?\n\nKarar ver. SADECE asagidaki JSON formatinda cevap ver:\n{\n  "karar": "DEVAM_ET" | "BITIR" | "HATA",\n  "neden": "Kararin kisa gerekcesi (1-2 cumle)",\n  "tavsiye": "DEVAM_ET ise ajana siradaki adim icin ipucu ver. BITIR ise ne tamamlandigini yaz. HATA ise kullaniciya bildirilecek mesaji yaz."\n}`;
+  const customTemplate = (config && config.systemPrompts && config.systemPrompts.sgm_health_check) ? config.systemPrompts.sgm_health_check : null;
+  const checkPrompt = customTemplate
+    ? customTemplate.replace(/\{\{stepCount\}\}/g, String(stepCount)).replace(/\{\{prompt\}\}/g, prompt).replace(/\{\{summaries\}\}/g, summaries.join('\n'))
+    : defaultCheckPrompt;
   try {
-    const res = await llmFetch([{ role: 'system', content: 'You respond with valid JSON.' }, { role: 'user', content: checkPrompt }], 0.2, 'SGM Health Check');
+    const res = await llmFetch([{ role: 'system', content: 'You respond with valid JSON.' }, { role: 'user', content: checkPrompt }], 0.2, 'SGM Health Check', 3, 'library_mode');
     return JSON.parse(cleanMalformedJsonString(res));
   } catch(e) {
     return { karar: 'DEVAM_ET', neden: 'Saglik kontrolu basarisiz, devam ediliyor.', tavsiye: '' };
@@ -250,7 +333,7 @@ async function processLibraryTaskSGM(prompt, subMode) {
   broadcastTerminal(`> [ENTITY ROUTER] Kullanıcı metni analiz ediliyor...\n`);
   let entities = [];
   try {
-    const routerPrompt = `Kullanıcının aşağıdaki isteğini analiz et. İstekte kaç farklı "Kişi", "Kurum" veya "Bağımsız Olay/Konu" geçiyor?
+    const defaultRouterPrompt = `Kullanıcının aşağıdaki isteğini analiz et. İstekte kaç farklı "Kişi", "Kurum" veya "Bağımsız Olay/Konu" geçiyor?
 Her bir varlık/olay için işlemleri tamamen ayıracağız. Onları aşağıdaki JSON formatında listele:
 {
   "entities": [
@@ -262,7 +345,11 @@ Her bir varlık/olay için işlemleri tamamen ayıracağız. Onları aşağıdak
 Eğer istekte sadece bir konudan/kişiden bahsediliyorsa listeye sadece 1 eleman koy.
 Instruction içine o varlıkla ilgili tüm detayları eksiksiz yaz.
 Kullanıcı İsteği: "${prompt}"`;
-    const routerRes = await llmFetch([{ role: 'system', content: 'You respond with valid JSON.' }, { role: 'user', content: routerPrompt }], 0.1, 'Entity Router');
+    const customRouterTemplate = (config && config.systemPrompts && config.systemPrompts.entity_router) ? config.systemPrompts.entity_router : null;
+    const routerPrompt = customRouterTemplate
+      ? customRouterTemplate.replace(/\{\{prompt\}\}/g, prompt)
+      : defaultRouterPrompt;
+    const routerRes = await llmFetch([{ role: 'system', content: 'You respond with valid JSON.' }, { role: 'user', content: routerPrompt }], 0.1, 'Entity Router', 3, 'library_mode');
     const parsed = JSON.parse(cleanMalformedJsonString(routerRes));
     if (parsed.entities && Array.isArray(parsed.entities)) {
       entities = parsed.entities;
@@ -324,7 +411,7 @@ Ne yapmak istiyorsun? SADECE JSON formatında cevap ver:
       let llmRes = await llmFetch([
         { role: 'system', content: 'You respond with valid JSON.' },
         { role: 'user', content: sysPrompt }
-      ], 0.1, 'SGM Library Loop');
+      ], 0.1, 'SGM Library Loop', 3, 'library_mode');
 
       try {
         let parsed = JSON.parse(cleanMalformedJsonString(llmRes));
@@ -809,4 +896,4 @@ Eğer güncellenmesi gerekiyorsa sadece YENI METNI yaz.`;
 }
 
 
-module.exports = { runLibraryModeSubLoop, processLibraryTask, resolveLibraryAsk };
+module.exports = { runLibraryModeSubLoop, processLibraryTask, resolveLibraryAsk, runLibraryAddSubLoop };

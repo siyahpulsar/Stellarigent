@@ -47,7 +47,7 @@ async function updateDiscordStatus(status, stepInfo, explanation, st = null) {
   if (!state.activeStatusMessage) return;
   try {
     const embed = new EmbedBuilder()
-      .setTitle("🤖 Stellarch Ajan Durumu")
+      .setTitle("🤖 Stellarigent Ajan Durumu")
       .setColor(status === 'pending_approval' ? 0xf59e0b : (status === 'executing' ? 0x3b82f6 : 0x10b981))
       .setDescription(`**Durum:** ${status.toUpperCase().replace('_', ' ')}`)
       .addFields({ name: 'Aktif Adım', value: stepInfo || 'Düşünülüyor...' });
@@ -74,7 +74,7 @@ async function sendDiscordFinalResult(messageText) {
   if (!state.activeStatusMessage || !state.activeChannel) return;
   try {
     const embed = new EmbedBuilder()
-      .setTitle("✅ Stellarch Ajan Görevi Bitti")
+      .setTitle("✅ Stellarigent Ajan Görevi Bitti")
       .setColor(messageText.includes('Başarıyla') || messageText.includes('successfully') ? 0x10b981 : 0xef4444)
       .setDescription(messageText);
     const finalMsg = await state.activeStatusMessage.reply({ embeds: [embed] });
@@ -154,6 +154,35 @@ async function sendApprovalRequest(action) {
   } catch (err) {}
 }
 
+async function sendPendingRuleProposal(ruleObj) {
+  let targetChannel = state.activeChannel;
+  if (!targetChannel && state.client && state.client.guilds.cache.size > 0) {
+    for (const guild of state.client.guilds.cache.values()) {
+      const channel = guild.channels.cache.find(c => c.type === 0 && c.permissionsFor(guild.members.me).has('SendMessages'));
+      if (channel) { targetChannel = channel; break; }
+    }
+  }
+  if (!targetChannel) return;
+  try {
+    const embed = new EmbedBuilder()
+      .setTitle("🛡️ Yeni Güvenlik Kuralı Önerisi")
+      .setColor(0x3b82f6)
+      .setDescription(`Kullanıcı iptali sonrasında yeni bir güvenlik kuralı önerildi:`)
+      .addFields(
+        { name: "Kural", value: `**${ruleObj.rule}**` },
+        { name: "Kategori", value: `\`${ruleObj.category || 'SECURITY_VIOLATION'}\`` }
+      );
+    if (ruleObj.context) embed.addFields({ name: "Gerekçe", value: ruleObj.context });
+
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`approve_rule_${ruleObj.id}`).setLabel('Kuralı Onayla (Active)').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`reject_rule_${ruleObj.id}`).setLabel('Kuralı Reddet (Sil)').setStyle(ButtonStyle.Danger)
+    );
+    const sentMsg = await targetChannel.send({ embeds: [embed], components: [row] });
+    trackMessage(sentMsg, { hasToolCall: false });
+  } catch (err) {}
+}
+
 async function handleAgentMention(message, cleanContent) {
   state.trackedMessages = [];
   trackMessage(message, { isUserTrigger: true, hasToolCall: false });
@@ -164,4 +193,4 @@ async function handleAgentMention(message, cleanContent) {
   if (state.serverCb && state.serverCb.startDiscordAgentTask) state.serverCb.startDiscordAgentTask(cleanContent, message, replyMessage);
 }
 
-module.exports = { updateDiscordStatus, sendDiscordFinalResult, sendChannelMessage, sendApprovalRequest, handleAgentMention, trackMessage };
+module.exports = { updateDiscordStatus, sendDiscordFinalResult, sendChannelMessage, sendApprovalRequest, sendPendingRuleProposal, handleAgentMention, trackMessage };

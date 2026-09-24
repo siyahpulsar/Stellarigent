@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Local AI Agent IDE</title>
+  <title>Stellarigent IDE</title>
   <link rel="stylesheet" href="ide.css">
 </head>
 <body>
@@ -110,10 +110,11 @@
     </div>
   </div>
 
-  <!-- Monaco Editor Loader -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.38.0/min/vs/loader.min.js"></script>
+  <!-- Monaco Editor — yerel node_modules üzerinden yükleniyor (offline uyumlu) -->
+  <!-- CDN bağımlılığı kaldırıldı: 'cdnjs.cloudflare.com/monaco-editor/0.38.0' -->
+  <script src="../node_modules/monaco-editor/min/vs/loader.js"></script>
   <script>
-    require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.38.0/min/vs' } });
+    require.config({ paths: { 'vs': '../node_modules/monaco-editor/min/vs' } });
     require(['vs/editor/editor.main'], function () {
       window.monacoEditor = monaco.editor.create(document.getElementById('editor-container'), {
         value: "",
@@ -124,7 +125,16 @@
       });
       // Fire event to notify ide.js
       window.dispatchEvent(new Event('monacoReady'));
+    }, function(err) {
+      // Monaco yüklenemedi (node_modules eksik olabilir) — textarea fallback'i devreye al
+      console.warn('[Monaco] Yüklenemedi, textarea fallback aktif:', err);
+      const container = document.getElementById('editor-container');
+      if (container) container.style.display = 'none';
+      const fallback = document.getElementById('file-editor');
+      if (fallback) { fallback.style.display = 'block'; fallback.style.height = '100%'; }
+      window.dispatchEvent(new Event('monacoFailed'));
     });
   </script>
+
 </body>
 </html>

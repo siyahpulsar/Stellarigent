@@ -1,29 +1,34 @@
+# 🤖 Stellarigent (Autonomous Local AI Agent Framework)
 
-# 🤖 Local AI Computer-Use Agent (Stellarch Agent Framework)
-
-> **100% Local, Autonomous AI Computer Agent with Real-Time Web Dashboard, Discord Integration, Puppeteer Web Automation & Multi-Agent Swarm Mode.**
+> **100% Local, Autonomous AI Computer Agent with Real-Time Web Dashboard, Electron Desktop IDE, Discord Bot, Puppeteer Web Automation, Multi-Agent Swarm Mode, Model Routing & Failover Ladder.**
 
 ---
 
 ## 📖 Table of Contents / İçindekiler
 - [English Documentation](#-english-documentation)
   - [1. System Overview & Core Mission](#1-system-overview--core-mission)
-  - [2. Architectural Innovations](#2-architectural-innovations)
-  - [3. Global AI Agent Tier List & Benchmarks](#3-global-ai-agent-tier-list--benchmarks)
-  - [4. Local LLM Tier List & Compatibility](#4-local-llm-tier-list--compatibility)
-  - [5. Repository Layout & Module Breakdown](#5-repository-layout--module-breakdown)
-  - [6. Prerequisites & Environment Setup](#6-prerequisites--environment-setup)
-  - [7. Configuration Guide (Step-by-Step)](#7-configuration-guide-step-by-step)
-  - [8. Running the Application](#8-running-the-application)
+  - [2. Comprehensive Feature Matrix](#2-comprehensive-feature-matrix)
+  - [3. Architectural Innovations](#3-architectural-innovations)
+  - [4. Deterministic Evals & Benchmark Suite](#4-deterministic-evals--benchmark-suite)
+  - [5. Local LLM Tier List & Compatibility](#5-local-llm-tier-list--compatibility)
+  - [6. Repository Layout & Module Breakdown](#6-repository-layout--module-breakdown)
+  - [7. Available Tools (Full 22 Tool Inventory)](#7-available-tools-full-22-tool-inventory)
+  - [8. User Interfaces: Web Dashboard & Electron IDE](#8-user-interfaces-web-dashboard--electron-ide)
+  - [9. Prerequisites & Environment Setup](#9-prerequisites--environment-setup)
+  - [10. Configuration Guide (Step-by-Step)](#10-configuration-guide-step-by-step)
+  - [11. Running the Application](#11-running-the-application)
 - [Türkçe Dokümantasyon](#-türkçe-dokümantasyon)
   - [1. Sistem Genel Bakışı ve Temel Hedef](#1-sistem-genel-bakışı-ve-temel-hedef)
-  - [2. Mimari İnovasyonlar](#2-mimari-inovasyonlar)
-  - [3. Küresel Yapay Zeka Ajan Tier Listesi ve Karşılaştırma](#3-küresel-yapay-zeka-ajan-tier-listesi-ve-karşılaştırma)
-  - [4. Yerel LLM Model Yetenek Seviyeleri](#4-yerel-llm-model-yetenek-seviyeleri)
-  - [5. Modül ve Dizin Haritası](#5-modül-ve-dizin-haritası)
-  - [6. Kurulum Gereksinimleri](#6-kurulum-gereksinimleri)
-  - [7. Yapılandırma Rehberi (Adım Adım)](#7-yapılandırma-rehberi-adım-adım)
-  - [8. Uygulamayı Çalıştırma ve Docker](#8-uygulamayı-çalıştırma-ve-docker)
+  - [2. Kapsamlı Özellik Matrisi](#2-kapsamlı-özellik-matrisi)
+  - [3. Mimari İnovasyonlar](#3-mimari-inovasyonlar)
+  - [4. Deterministik Eval ve Test Paketi (Benchmark Suite)](#4-deterministik-eval-ve-test-paketi-benchmark-suite)
+  - [5. Yerel LLM Model Yetenek Seviyeleri](#5-yerel-llm-model-yetenek-seviyeleri)
+  - [6. Modül ve Dizin Haritası](#6-modül-ve-dizin-haritası)
+  - [7. Kullanılabilir Araçlar (Tam 22 Araç Envanteri)](#7-kullanılabilir-araçlar-tam-22-araç-envanteri)
+  - [8. Kullanıcı Arayüzleri: Web Paneli ve Electron IDE](#8-kullanıcı-arayüzleri-web-paneli-ve-electron-ide)
+  - [9. Kurulum Gereksinimleri](#9-kurulum-gereksinimleri)
+  - [10. Yapılandırma Rehberi (Adım Adım)](#10-yapılandırma-rehberi-adım-adım)
+  - [11. Uygulamayı Çalıştırma ve Docker](#11-uygulamayı-çalıştırma-ve-docker)
 - [License / Lisans](#-license)
 
 ---
@@ -32,67 +37,76 @@
 
 ### 1. System Overview & Core Mission
 
-This repository provides an open-source, production-grade **Local AI Computer-Use Agent framework**. Designed to run 100% locally without cloud API subscriptions or external tokens, it connects directly to **LM Studio** (or any OpenAI-compatible local REST server) to give local language models computer manipulation capabilities.
-
-The agent can autonomously:
-- Perform file system reads, writes, and directory scans within sandbox bounds.
-- Execute system shell commands (PowerShell/Bash) with risk assessment.
-- Browse the web, take page screenshots, search web engines, and download media via Puppeteer.
-- Stream state live to an interactive Web UI dashboard via WebSockets.
-- Interact remotely over Discord channels, approving/rejecting actions with interactive Discord UI buttons and streaming voice channel music (`yt-dlp`).
+**Stellarigent** is an open-source, production-grade **Autonomous Local AI Computer-Use Agent framework**. It is designed to run 100% locally on your machine without mandatory cloud subscriptions or API keys. It interfaces directly with **LM Studio** (or any OpenAI-compatible local REST server) to grant language models real-world computer manipulation, research, and coding capabilities.
 
 ---
 
-### 2. Architectural Innovations
+### 2. Comprehensive Feature Matrix
 
-Based on system analysis and architectural research (`research_notes.md`), the codebase features key technical highlights:
-
-1. **Entity Router & Single-Shot Upsert (SGM):** The Sequential Goal Mode (SGM) utilizes an Entity Router to extract distinct subjects/events from complex user prompts and isolates them into separate execution loops. The legacy "Best-of-N" evaluator was replaced with a highly optimized `temperature: 0.1` single-shot JSON generator, vastly reducing token consumption and latency.
-2. **Manual AI Bridge:** If the local LLM crashes or is offline, the system automatically transitions into Manual AI Bridge mode. It formats current task prompts into copy-paste blocks for external web models (Gemini, Claude, ChatGPT) and resumes execution seamlessly when the user pastes back the response.
-3. **Delta Patch WebSocket Engine:** Instead of re-broadcasting entire state trees, `src/state.js` uses a debounced (150ms) delta diff broadcaster (`state_patch`) to minimize CPU usage and network bandwidth.
-4. **5-Tiered Tool Call Parser:** Supports tool invocation across 5 distinct LLM output formats: JSON Markdown codeblocks, raw JSON objects, XML tags, Qwen `[TOOL_CALLS]` syntax, and Heuristic Regex fallback—enabling robust tool execution even on 3B/7B low-parameter models.
-5. **Strict Security Sandbox:** Uses canonical `fs.realpathSync` path resolution to prevent symlink traversal attacks outside allowed workspace boundaries. Includes a Levenshtein-distance banned-word scanner and dynamic action risk scoring (`pending_approval`).
-6. **Swarm Multi-Agent Mode:** Dynamically re-prompts the model to switch roles (**Planner** $\rightarrow$ **Developer** $\rightarrow$ **QA Tester**) during multi-step task execution.
-7. **RAG Memory + TF-IDF Fallback:** Computes cosine similarity over vectorized task histories (using LM Studio embeddings). Automatically falls back to keyword frequency indexing (TF-IDF light) if embedding models are offline.
-
----
-
-### 3. Global AI Agent Tier List & Benchmarks
-
-In benchmark comparisons against major autonomous AI agent frameworks (`agent_karsilastirmalari.md`), the **Stellarch Local AI Agent** achieves top-tier ratings for privacy, security, and local execution:
-
-#### 🏆 100-Point Benchmark Ranking (2026)
-
-| Tier | Agent / Framework | Score (100) | Highlight |
-| :---: | :--- | :---: | :--- |
-| **` S `** | **Antigravity / Cursor / Windsurf** | **94 / 100** | Deep IDE integration & real-time context index. |
-| **` S `** | **Stellarch (Local AI Agent)** | **88 / 100** | **%100 Local, Zero-Subscription, Sandbox Guard & Manual AI Bridge.** |
-| **` A `** | **CrewAI** | **85 / 100** | Role-based multi-agent collaboration. |
-| **` A `** | **LangGraph (LangChain)** | **84 / 100** | Stateful graph-based agent routing. |
-| **` A `** | **Cognition Devin** | **83 / 100** | Autonomous cloud software engineer. |
-| **` B `** | **Microsoft AutoGen** | **79 / 100** | Conversational multi-agent framework. |
-| **` B `** | **OpenInterpreter** | **78 / 100** | Local code interpreter & terminal agent. |
-| **` B `** | **Claude Engineer** | **75 / 100** | CLI-based autonomous assistant. |
-| **` C `** | **Microsoft Taskweaver** | **68 / 100** | Data analytics agent. |
-| **` C `** | **AutoGPT** | **62 / 100** | Classic autonomous loop pioneer. |
-| **` D `** | **BabyAGI** | **45 / 100** | Concept loop execution. |
-
-#### 📊 Category Comparison Matrix
-
-| Agent / Framework | 100% Local & Privacy (20%) | Safety & Approval (15%) | Ease of Use & UI (15%) | Self-Correction (15%) | Swarm Multi-Agent (15%) | Tool & OS Access (20%) | TOTAL SCORE |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Antigravity / Cursor** | 70 | 90 | 98 | 95 | 92 | 98 | **94 / 100** |
-| **Stellarch (Local Agent)** | **100** | **95** | **88** | **85** | **82** | **85** | **88 / 100** |
-| **CrewAI** | 80 | 70 | 80 | 85 | 95 | 85 | **85 / 100** |
-| **LangGraph** | 85 | 75 | 70 | 90 | 92 | 90 | **84 / 100** |
-| **Cognition Devin** | 10 | 85 | 95 | 92 | 88 | 95 | **83 / 100** |
-| **OpenInterpreter** | 90 | 60 | 70 | 75 | 50 | 95 | **78 / 100** |
+- **100% Local & Private:** No prompts, files, or tokens leave your local machine unless you explicitly configure cloud fallbacks.
+- **Dual Execution Environments:**
+  - **Modern Web Dashboard:** Real-time monitoring, live WebSocket streaming, manual tool execution, and a consolidated 6-panel configuration center.
+  - **Electron Desktop IDE:** Standalone desktop app featuring a local Monaco code editor, file explorer, agent task bar, and dynamic port synchronizer.
+- **Dynamic Model Routing & Fallback Ladder:**
+  - **Tool-Based Model Switching:** Automatically instructs LM Studio to load the ideal model for specific tasks (e.g. lightweight models for searches, heavy coder models for code generation).
+  - **Fallback Ladder:** If the active local model fails or encounters errors, the agent seamlessly climbs a configured local model ladder (`#1 -> #2 -> #3`) before falling back to cloud APIs.
+  - **Auto-Modes Profile Injection:** Automatically synchronizes system settings (LPM, OM, Deep Reasoning, Task Plan) depending on the currently loaded model.
+- **Flexible Execution Modes:**
+  - **Manuel Tools:** Single-call tool execution without task plan overhead.
+  - **Research Mode (Web, Local, Deep Web):** Autonomous research pipelines that search, scrape, summarize, and cite web sources without generating IDE checklists.
+  - **Library Mode (SGM):** Entity-routed, single-shot upsert engine for managing knowledge bases and user profiles in `Libraries/`.
+  - **Agent Runner (Swarm Mode):** Multi-agent persona switching (`Planner` $\rightarrow$ `Developer` $\rightarrow$ `QA Tester`) for complex multi-step software engineering tasks.
+- **Multi-Platform Discord Bot:**
+  - Remote task delegation (`!ask <prompt>`) and live status broadcasts.
+  - Interactive approval cards with Discord UI buttons for tool actions (`Approve` / `Reject`) and proposed security rules (`approve_rule_<id>` / `reject_rule_<id>`).
+  - Cross-platform voice channel music player powered by `yt-dlp` (Windows, Linux, Docker).
+- **Production-Grade Resilient Memory (`config/memory.json`):**
+  - **Two-Stage Pruning:** Mathematical scoring ($\text{Score} = \text{accessCount} \times 2.0 - \text{age}/72$) with 24-hour Grace Period protection (capped at 35 items) and 50-item hard quota.
+  - **Legacy Data Migration:** Automatic normalization (`normalizeMemoryItem`) guarding against `NaN` sort corruption on legacy records.
+  - **Zero-Data-Loss RAM Buffer & Emergency Flush:** In-memory queue during OS file locks (EPERM/EBUSY) with synchronous exit hooks (`emergencyFlushSync` on `beforeExit`, `SIGINT`, `SIGTERM`).
+  - **Human-Reviewed Rule Distillation:** User rejections distill into an isolated `pendingRules` pool (max 10, 7-day TTL) requiring explicit confirmation before activation.
+- **Manual AI Bridge:** Graceful offline fallback that converts prompts into copy-paste blocks for external web models (Gemini, Claude, ChatGPT) and resumes the loop upon response paste.
+- **Strict Security & Sandboxing:**
+  - **Project Core Shield:** Prevents agents from accessing, modifying, or deleting source code files (`src/**`, `server.js`, `package.json`, `.env`, `config/`).
+  - **Programmatic Rule Exception Enforcement:** `checkRuleExceptionMatch` validates `exceptions: []` arrays programmatically to avoid false positives and instruction drift.
+  - **Tripwire Circuit Breaker:** Immediate emergency halt if an agent reads `agent_user.json` and subsequently attempts to read any secondary file, with scoped task release and manual reset button.
+  - **Web Sanitizer:** Strips prompt injection, hidden DOM tags, and zero-width artifacts from scraped websites.
+  - **Safe Git Staging:** Executes `git add -u` via argument vectors (`execFile`) to stage only tracked files, preventing accidental commits of untracked scratch data or memory backups.
 
 ---
 
-### 4. Local LLM Tier List & Compatibility
+### 3. Architectural Innovations
 
-Recommended model sizes for running the agent locally in LM Studio:
+1. **Entity Router & Single-Shot Upsert (SGM):** Replaces legacy Best-of-N blind evaluations with an Entity Router that splits multi-subject prompts into isolated execution loops. Modifies JSON profiles using single-shot `temperature: 0.1` generation.
+2. **Delta Patch State Management:** Broadcasts debounced (150ms) delta diffs (`state_patch`) over WebSockets instead of full state trees, minimizing CPU and bandwidth consumption.
+3. **5-Tiered Tool Call Parser:** Parses LLM outputs across JSON Markdown codeblocks, raw JSON objects, XML tags, Qwen `[TOOL_CALLS]` syntax, and Heuristic Regex fallback—ensuring reliable tool calls even on 3B/7B models.
+4. **Task Plan Exemption (`isNoTaskPlanMode`):** Completely disables software checklist requirements for Manuel Tools, Research, and Library modes.
+5. **Real-Time Cost Accounting & Daily Budget Circuit Breaker (`costTracker.js`):** Tracks exact prompt and completion token costs across providers, with automated cut-off when daily spend exceeds `$1.00`.
+6. **System Metrics & Health Monitoring:** Real-time CPU and RAM broadcast loop, along with a dedicated `GET /api/health` diagnostic endpoint.
+
+---
+
+### 4. Deterministic Evals & Benchmark Suite
+
+Rather than relying on unverified subjective tier scores, Stellarigent features an integrated, reproducible **Deterministic Benchmark & Evaluation Suite** (`npm run eval` or `node evals/run_evals.js`). This test suite validates agent behavior across core subsystems without relying on external network calls or non-deterministic model outputs.
+
+| Suite | Scenarios | Target Subsystem | Status |
+| :--- | :---: | :--- | :---: |
+| **Parser Resilience** | 5 | Markdown codeblocks, raw JSON, XML tags, Qwen `[TOOL_CALLS]`, Heuristic Regex fallback | ✅ **PASS** (5/5) |
+| **Security & Confinement** | 3 | Core shield isolation (`src/**`), Path traversal rejection (`..`), Network egress blocking (`curl`, `irm`) | ✅ **PASS** (3/3) |
+| **Tripwire Lifecycle** | 2 | Exfiltration tripwire arming & halt, Tripwire task reset & recovery | ✅ **PASS** (2/2) |
+| **Cost & Quota Tracking** | 2 | Local 0-cost usage recording, Cloud provider pricing calculation & daily budget tripwire | ✅ **PASS** (2/2) |
+| **Memory Pruning** | 1 | Two-stage mathematical pruning score, 24h grace period protection, 50-item hard quota | ✅ **PASS** (1/1) |
+| **Overall Score** | **13 Scenarios** | **Full System Integrity Check** | **100.0% Pass Rate** |
+
+To run the evaluation suite locally:
+```bash
+npm run eval
+```
+
+---
+
+### 5. Local LLM Tier List & Compatibility
 
 | Tier | Model Class / Size | Performance & Tool Use Evaluation |
 | :---: | :--- | :--- |
@@ -102,139 +116,177 @@ Recommended model sizes for running the agent locally in LM Studio:
 | **` C `** | **Gemma 3 (12B)** | **Moderate**. Performs single-tool calls well; may stumble on complex multi-stage tasks. |
 | **` D `** | **Qwen 2.5 Coder (7B)** | **Acceptable**. Suitable for lightweight local hardware; keep prompts direct. |
 | **` E `** | **Qwen 2.5 (3B)** | **Weak**. Baseline tool calls work; requires Manual AI Bridge assistance on long loops. |
-| **` F `** | **Qwen 2.5 (0.5B)** | **Unusable**. Parameter capacity causes malformed JSON syntax errors. |
 
 ---
 
-### 5. Repository Layout & Module Breakdown
-
-Map of key modules and responsibilities (`genel_proje_bilgisi.md`):
+### 6. Repository Layout & Module Breakdown
 
 ```
 .
-├── server.js               # Express HTTP & WebSocket server, CPU/RAM metrics broadcaster
-├── Dockerfile              # Docker sandbox container specification
-├── docker-compose.yml      # Multi-container orchestration config
-├── package.json            # Node.js dependencies (express, ws, discord.js, puppeteer)
-├── README.md               # Comprehensive bilingual project documentation
+├── server.js               # Express HTTP & WebSocket server, health checks, CPU/RAM metrics, tripwire reset API
+├── Dockerfile              # Isolated container specifications with Chromium & Node.js
+├── docker-compose.yml      # Docker container orchestration
+├── package.json            # Dependencies, eval and test npm scripts
+├── README.md               # Bilingual comprehensive project guide
+├── genel_proje_bilgisi.md  # Core architectural reference map
 ├── agent_readme.md         # Auto-updated workspace map & accomplishment log
-├── config/                 # Dynamic configuration files (JSON schemas)
-│   ├── config.json         # Admin IDs, connection speed limits, founder auth key
-│   ├── kurucu.json         # Founder Discord User ID specification
-│   ├── permissions.json    # Authorized Discord users list
-│   ├── security_rules.json # Banned words, forbidden shell commands, whitelisted paths
-│   └── memory.json         # Vectorized memory bank of completed tasks
-├── src/                    # Core application logic
-│   ├── agent.js            # Main loop runner (runAgentLoop), Swarm mode, approval resolver
-│   ├── state.js            # Central reactive agentState, WebSocket delta diff patcher
-│   ├── security.js         # Levenshtein word check, realpathSync sandbox, risk scoring
-│   ├── memory.js           # RAG vector memory (cosine similarity) + TF-IDF fallback
+├── bundle_docs.py          # Python documentation bundler script
+├── bundled_documentation.md# Consolidated documentation file
+├── evals/                  # Deterministic evaluation & benchmark suite
+│   ├── run_evals.js        # Benchmark runner and markdown report generator
+│   ├── scenarios.js        # 13 deterministic test scenarios across 5 system areas
+│   └── latest_eval_report.md# Latest benchmark execution report
+├── config/                 # Dynamic system configuration schemas
+│   ├── config.json         # Admins, fallbacks, model tags, ladder, budget cap, and mode profiles
+│   ├── security_rules.json # Banned words, forbidden commands, allowed folders
+│   ├── setup.json          # Setup wizard state indicator
+│   ├── memory.json         # Vector memory bank & pending rules queue (50 limit, Two-Stage Pruning)
+│   └── system_prompts.json # 16 dynamic system and micro-prompts
+├── src/                    # Core system logic
+│   ├── agent.js            # Main loop runner (runAgentLoop), Swarm switcher, manual tool runner, rule distillation
+│   ├── state.js            # Central reactive state, delta diff patcher, cost metrics, transient error buffer
+│   ├── security.js         # Core shield, task-scoped tripwire, resetTripwire, egress command blocking
+│   ├── memory.js           # Production memory queue, Two-Stage Pruning, EPERM backoff, safe git staging (git add -u)
 │   ├── llm/
-│   │   └── llmClient.js    # LM Studio fetcher, retry exponential backoff, 5-format parser
+│   │   ├── llmClient.js    # 5-tier parser, failover logic, dynamic environment prompt, budget circuit breaker
+│   │   ├── costTracker.js  # Real-time token accounting, multi-provider rate cards, daily budget cap tracking
+│   │   └── modelManager.js # Native LM Studio REST API, lms CLI fallback, model routing & ladder
 │   ├── modes/
-│   │   └── libraryMode.js  # Guide & reference searching sub-loop
-│   ├── rag/
-│   │   └── vectorSearch.js # Cosine similarity vector search math
-│   ├── tools/              # Tool engines (system execution, Puppeteer browser, filesystem)
-│   ├── utils/              # Environment variable helpers (.env reader/writer)
-│   ├── ws/                 # WebSocket message & event routing engine
-│   └── discord/            # Discord bot client, music player (yt-dlp), interaction cards
-└── WikiLike/               # Obsidian-compatible wiki documentation
+│   │   └── libraryMode.js  # Entity router, single-shot upsert, library search sub-loop
+│   ├── security/
+│   │   └── webSanitizer.js # Web scraping sanitizer, prompt injection defense, audit logger
+│   ├── tools/              # 21 concrete tool implementations with environment sanitization
+│   └── discord/            # Discord bot client, cross-platform yt-dlp music player, approval bridge
+├── electron/               # Standalone Electron Desktop IDE
+│   ├── main.js             # Electron main process, dynamic port reader (.env)
+│   ├── index.html          # IDE layout with offline Monaco Editor
+│   └── ide.js              # Monaco integration, file tree explorer, agent task runner
+└── WikiLike/               # In-depth Obsidian-compatible technical documentation
 ```
 
 ---
 
-### 6. Prerequisites & Environment Setup
+### 7. Available Tools (Full 22 Tool Inventory)
 
-Before running the application:
-
-1. **Node.js** (v18.0.0 or higher).
-2. **LM Studio** installed and running with local API server enabled (`http://localhost:1234`).
-3. **Google Chrome / Chromium** installed (required for Puppeteer visual web browsing).
-4. *(Optional)* A **Discord Bot Token** from the [Discord Developer Portal](https://discord.com/developers/applications) if using Discord.
+1. **`execute_command`**: Runs PowerShell or Bash shell commands in isolated workspaces with scrubbed environment and egress shield.
+2. **`open_application`**: Launches a desktop application or file safely.
+3. **`web_search`**: Performs DuckDuckGo / Yahoo searches.
+4. **`view_website`**: Navigates to a URL, renders dynamic JavaScript via Puppeteer, and sanitizes dangerous injection artifacts.
+5. **`deep_web_search`**: Multi-URL web research engine with per-source summaries and master synthesis via `llmFetch`.
+6. **`read_file`**: Reads text files within allowed workspace bounds (core engine protected).
+7. **`read_pdf`**: Ingests and extracts clean text content from PDF documents.
+8. **`write_file`**: Writes files to `scratch/` or `By_Agent/` sandboxes.
+9. **`list_directory`**: Lists contents of a directory (masks protected root source files).
+10. **`take_screenshot`**: Captures the desktop display and saves it to `public/` (attached to vision context).
+11. **`download_image`**: Downloads remote images to disk with vision validation.
+12. **`task_plan`**: Decomposes multi-step tasks into actionable checklists.
+13. **`select_guide`**: Dynamically binds a specialized Obsidian guide to the system prompt.
+14. **`task_complete`**: Finalizes the task, records accomplishments, and triggers safe `git add -u && git commit`.
+15. **`generate_workspace_rules`**: Auto-generates `.agent-rules.md` template based on workspace files.
+16. **`send_discord_message`**: Sends text and file attachments directly to Discord channels.
+17. **`filter_output`**: Filters large tool outputs via line matching, URL extraction, or quoted substrings.
+18. **`url_image_reader`**: Extracts and analyzes images from a web page using vision models.
+19. **`extract_chart_data`**: Digitizes financial tables and trend charts into JSON coordinate arrays.
+20. **`line_checker`**: Performs token-efficient targeted line scans on large files.
+21. **`library_mode`**: Semantic knowledge search across files in `Libraries/` via `runLibraryModeSubLoop`.
+22. **`notify_user`**: Sends desktop system toast notifications (Windows PowerShell balloon, macOS osascript, Linux notify-send) on task completion, warnings, or errors.
 
 ---
 
-### 7. Configuration Guide (Step-by-Step)
+### 8. User Interfaces: Web Dashboard & Electron IDE
 
-To configure the open-source template files for your environment:
+#### Web Dashboard (`http://localhost:3000`)
+- **Left Sidebar Accordion:** Fast switching between **Manuel Tools**, **Research**, **Library**, and **Agent Runner**, plus live Token & Estimated Cost metrics.
+- **Consolidated 6-Panel Settings Center:**
+  1. `Guide Manager`: Markdown guide editor for custom domain workflows.
+  2. `Models & Routing`: Unified hub containing segmented subtabs for **LM Studio** local endpoint/tagging, **Cloud API Keys** (OpenAI, Anthropic, Gemini, Groq), and **Model Routing & Fallback Ladder**.
+  3. `Prompts`: Live editor for 16 system/micro-prompts, zero-backup overwrites, and the architectural flowchart (`system_prompts_algorithm.svg`).
+  4. `Auto & Budget`: Granular auto-approval permissions for low-risk tools, LPM settings, and daily cloud expenditure limit (`maxDailyCostUSD`).
+  5. `Discord`: Token, Founder ID, speed limits, bot status, and authorized users.
+  6. `Security & Perm`: Banned shell command blacklist manager with interactive badge tags and Safety Tripwire manual reset control.
 
-#### Step 1: Create `.env`
-Copy `.env.example` to `.env`:
+#### Electron Desktop IDE (`npm run start:ide`)
+- Offline Monaco Editor powered by local `node_modules/monaco-editor`.
+- Dynamic port synchronization from `.env`.
+- Integrated file tree explorer and agent task console.
+
+---
+
+### 9. Prerequisites & Environment Setup
+
+1. **Node.js** (v18.0.0 or higher).
+2. **LM Studio** installed with local API server enabled (`http://localhost:1234`).
+3. **Google Chrome / Chromium** installed for Puppeteer web automation.
+4. *(Optional)* **Discord Bot Token** and Founder Discord User ID.
+
+---
+
+### 10. Configuration Guide (Step-by-Step)
+
+#### Step 1: Copy `.env.example`
 ```bash
 cp .env.example .env
 ```
-Fill in your credentials:
+Configure your environment:
 ```env
-# Discord Bot Client Token
-DISCORD_TOKEN=your_discord_bot_token_here
-
-# Web Dashboard Port
 PORT=3000
-
-# Discord User ID of the Founder
-FOUNDER_DISCORD_ID=your_discord_user_id_here
-
-# Admin Key for Web Dashboard authentication
-FOUNDER_KEY=CHANGE_ME_IN_PRODUCTION
+FOUNDER_KEY=YOUR_ADMIN_PASSWORD
+DISCORD_TOKEN=YOUR_DISCORD_BOT_TOKEN
+FOUNDER_DISCORD_ID=YOUR_DISCORD_USER_ID
 ```
 
-#### Step 2: Set `config/kurucu.json`
-Copy template and set your Discord User ID:
+#### Step 2: Install Dependencies
 ```bash
-cp config/kurucu.example.json config/kurucu.json
-```
-```json
-{
-  "founder": "YOUR_DISCORD_USER_ID_HERE"
-}
-```
-
-#### Step 3: Set `config/config.json`
-Copy template and configure admin permissions and security credentials:
-```bash
-cp config/config.example.json config/config.json
-```
-```json
-[
-  {
-    "admins": ["YOUR_DISCORD_USER_ID_HERE"],
-    "connectionSpeedLimit": 0.7,
-    "founderKey": "CHANGE_THIS_TO_A_SECURE_SECRET"
-  }
-]
-```
-
-#### Step 4: Set `config/permissions.json`
-Copy template and add authorized Discord user tags:
-```bash
-cp config/permissions.example.json config/permissions.json
-```
-```json
-[
-  {
-    "authorizedUsers": ["<@YOUR_DISCORD_USER_ID_HERE>"]
-  }
-]
+npm install
 ```
 
 ---
 
-### 8. Running the Application
+### 11. Running the Application
 
-#### Local Node.js Execution
-1. Install project dependencies:
-   ```bash
-   npm install
-   ```
-2. Start the backend server:
-   ```bash
-   npm start
-   ```
-3. Open `http://localhost:3000` in your web browser to access the Web Dashboard.
+#### Start Web Dashboard, Backend & Interactive Terminal CLI:
+```bash
+npm start
+```
+Access the web dashboard at `http://localhost:3000` or control the entire agent system directly through the **Interactive Terminal CLI**!
 
-#### Docker Sandbox Execution
-Run in an isolated container:
+#### 💻 Interactive Terminal CLI Controller
+When `npm start` is executed, an interactive command console (`Stellarigent [mode/submode | status]> `) launches simultaneously on standard terminal I/O. Both users and testing scripts can fully control and test the project:
+
+- **Menu & Mode Navigation:**
+  - `:menu` or `:help`: Display all commands and interactive modes.
+  - `:mode <agent|manuel|research|library>`: Switch between Swarm Agent, Direct Manuel Tools, Web/Local Research, and MemoryLibrary.
+  - `:submode <name>`: Switch sub-mode (e.g. `cmd_tool`, `file_reader`, `file_writer`, `deep_web`, `web`).
+- **Configuration & Runtime Settings:**
+  - `:settings` or `:config`: Display formatted ASCII table of LM Studio URL, active model, temperature, max steps, HPM/LPM flags, auto-approvals, and daily budget.
+  - `:set <key> <val>`: Update runtime configuration (e.g. `:set temperature 0.3`, `:set maxSteps 50`, `:set hpmMode true`).
+  - `:autoapprove <tool> <true|false>`: Toggle auto-approval for specific tools.
+  - `:models` & `:switch-model <modelId>`: Inspect and switch loaded LLM models in LM Studio.
+  - `:tripwire reset`: Reset the security tripwire circuit breaker.
+- **Task Execution & Approvals:**
+  - Type any prompt directly (or `:task <prompt>`): Dispatches to active mode loop.
+  - `:interrupt <instructions>`: Inject mid-task directions.
+  - `:abort`: Instantly kill active subprocesses and reset agent state to idle.
+  - **Interactive Approval Interceptor:** When an action requires approval, the terminal renders a formatted card (`displayApprovalCard`). Type `:y` / `y` / `:approve` to approve, `:n [reason]` / `n [reason]` / `:reject [reason]` to reject, or `:edit <json>` to modify parameters.
+- **Diagnostics & Testing:**
+  - `:status`: Show current task, steps checklist, thoughts, and executed tools.
+  - `:history [n]`: Display last $n$ chat messages.
+  - `:health`: Run system health check (`/api/health`).
+  - `:eval`: Execute deterministic benchmark evaluation suite (`evals/run_evals.js`).
+  - `:clear`: Clear chat history and reset agent.
+  - `:exit`: Gracefully shut down server.
+
+#### Start Electron Desktop IDE:
+```bash
+npm run start:ide
+```
+
+#### Run Deterministic Evals:
+```bash
+npm run eval
+```
+
+#### Run in Docker Container:
 ```bash
 docker-compose up --build
 ```
@@ -245,181 +297,256 @@ docker-compose up --build
 
 ### 1. Sistem Genel Bakışı ve Temel Hedef
 
-Bu proje, açık kaynaklı, üretim seviyesinde bir **Yerel Yapay Zeka Bilgisayar Kullanım Ajanı** (Local AI Computer-Use Agent) altyapısı sunar. Herhangi bir bulut aboneliği veya dış API anahtarı gerektirmeden %100 yerel olarak çalışmak üzere tasarlanmıştır. Doğrudan **LM Studio** (veya OpenAI ile uyumlu herhangi bir yerel REST sunucusu) ile bağlantı kurarak yerel yapay zeka modellerine bilgisayar yönetim yetenekleri kazandırır.
-
-Ajan otonom olarak şunları gerçekleştirebilir:
-- Sandbox sınırları içerisinde dosya okuma, yazma ve dizin tarama.
-- Risk değerlendirmesi ile sistem kabuk komutlarını (PowerShell/Bash) çalıştırma.
-- Puppeteer ile web sayfalarında gezinme, ekran görüntüsü alma, web araması yapma ve medya indirme.
-- WebSocket aracılığıyla etkileşimli Web Paneline canlı durum ve metrik aktarma.
-- Discord kanalları üzerinden uzaktan komut alma, butonlarla onay talep etme ve ses kanallarında müzik yayınlama (`yt-dlp`).
+**Stellarigent**, açık kaynaklı ve üretim seviyesinde bir **Yerel Yapay Zeka Bilgisayar Kullanım Ajanı (Local AI Computer-Use Agent)** platformudur. Herhangi bir bulut aboneliği veya dış API anahtarı zorunluluğu olmadan %100 yerel olarak çalışır. Doğrudan **LM Studio** (veya OpenAI uyumlu herhangi bir yerel REST sunucusu) ile haberleşerek yerel modellere dosya yönetimi, web araştırması, terminal komutları ve yazılım geliştirme kabiliyeti kazandırır.
 
 ---
 
-### 2. Mimari İnovasyonlar
+### 2. Kapsamlı Özellik Matrisi
 
-Sistem analizi ve araştırma notlarına (`genel_proje_bilgisi.md`) dayanan temel teknik yenilikler:
-
-1. **Varlık Ayrıştırıcı (Entity Router) ve Single-Shot Upsert:** Kütüphane modundaki Sıralı Görev Motoru (SGM), karmaşık kullanıcı metinlerindeki farklı kişileri/olayları tespit edip her biri için izole bir döngü başlatan zeki bir `Entity Router` kullanır. Eski "Best-of-N" (7 kez üretim yapıp puanlama) sistemi çöpe atılmış, yerine `temperature: 0.1` ayarlı süper hızlı "Single-Shot" JSON üretici getirilmiştir. Bu sayede maliyet ve API gecikmesi sıfıra indirilmiştir.
-2. **Manuel AI Köprüsü (Manual AI Bridge):** Yerel LLM çöktüğünde veya kapalı olduğunda sistem durmaz; istemleri harici web modellerine (Gemini, Claude, ChatGPT) kopyala-yapıştır yapabileceğiniz bir formata dönüştürür.
-3. **Delta Patch WebSocket Motoru:** Tüm state ağacını sürekli yeniden göndermek yerine `src/state.js`, ağ bant genişliğini ve CPU kullanımını korumak için sadece değişen verileri (`state_patch`) 150ms gecikmeyle yayınlar.
-4. **5 Katmanlı Araç Çağrı Ayrıştırıcısı:** JSON Markdown kod blokları, ham JSON, XML etiketleri, Qwen `[TOOL_CALLS]` sentaksı ve Heuristic Regex formatlarını destekler. Bu sayede 3B/7B gibi küçük modellerde bile araç çağrıları hatasız ayrıştırılır.
-5. **Gelişmiş Güvenlik Sandbox'ı:** Sembolik link saldırılarını engellemek için `fs.realpathSync` kullanır. Levenshtein mesafeli kelime tarayıcısı ve komut risk skorlaması (`pending_approval`) içerir.
-6. **Swarm Çoklu Ajan Modu:** Çok adımlı görevlerde yapay zekayı rol değiştirmeye yönlendirir (**Planlayıcı** $\rightarrow$ **Geliştirici** $\rightarrow$ **QA Testçi**).
-7. **Vektörel RAG Bellek + TF-IDF Fallback:** Görev geçmişini kosinüs benzerliği ile arar (LM Studio embeddings). Embedding modeli kapalıysa otomatik olarak TF-IDF kelime arama fallback'ine geçer.
+- **%100 Yerel ve Gizli:** Siz bulut yedekliliğini açıkça yapılandırmadıkça hiçbir istem, dosya veya veri bilgisayarınızın dışına çıkmaz.
+- **Çift Kullanıcı Arayüzü:**
+  - **Modern Web Kontrol Paneli:** Gerçek zamanlı WebSocket durumu, CPU/RAM metrikleri, tekil araç çalıştırma ve konsolide 6 sekmeli ayarlar merkezi.
+  - **Electron Masaüstü IDE:** Yerel Monaco kod editörü, dosya ağacı gezgini, ajan görev çubuğu ve dinamik port eşitlemesi sunan bağımsız masaüstü uygulaması.
+- **Model Yönlendirme ve Merdiven (Routing & Fallback Ladder):**
+  - **Araca Göre Model Değiştirme:** Görevin türüne göre LM Studio'ya uygun modeli otomatik yükletir (Örn: Arama için hızlı model, kodlama için yüklü model).
+  - **Model Merdiveni:** Aktif yerel model hata verirse, sistem tanımlanan yerel modeller basamağına (`#1 -> #2 -> #3`) tırmanır.
+  - **Model Bazlı Otomatik Mod Eşleme (Auto-Modes):** Model yüklendiğinde LPM, OM, Derin Düşünme ve Görev Planı ayarlarını modele göre otomatik açıp kapatır.
+- **Esnek Çalışma Modları:**
+  - **Manuel Araçlar:** Task plan gerekmeksizin tek seferlik doğrudan araç çalıştırma.
+  - **Research (Web, Local, Deep Web):** Kaynakları tarayan, özetleyen ve atıf ekleyen doğrudan araştırma motorları.
+  - **Library Modu (SGM):** Varlık ayrıştırıcı (Entity Router) ve tek atışlık (Single-Shot) upsert mantığıyla `Libraries/` bilgi tabanı yönetimi.
+  - **Agent Runner (Swarm Modu):** Çok adımlı projeler için rol değiştirme (**Planlayıcı** $\rightarrow$ **Geliştirici** $\rightarrow$ **QA Testçi**).
+- **Gelişmiş Discord Botu:**
+  - Uzaktan komut alma (`!ask <istek>`) ve canlı durum bildirimleri.
+  - Onay bekleyen işlemlerde (`approve_action` / `reject_action`) ve kural önerilerinde (`approve_rule_<id>` / `reject_rule_<id>`) interaktif butonlarla uzaktan yönetim.
+  - Çapraz platform uyumlu ses kanalı müzik çaları (`yt-dlp`).
+- **Üretim Kalitesinde Dayanıklı Bellek (`config/memory.json`):**
+  - **İki Aşamalı Kırpma (Two-Stage Pruning):** Matematiksel skorlama ($\text{Score} = \text{accessCount} \times 2.0 - \text{age}/72$), 24 saatlik Grace Period koruması (%70 / 35 kural tavanı) ve 50 kural kesin kotası.
+  - **Eski Veri Migrasyonu (NaN Koruması):** `normalizeMemoryItem` ile eksik alanları doldurur; `NaN` skor kaynaklı V8 sort çökmelerini engeller.
+  - **Sıfır Veri Kaybı RAM Buffer & Acil Tahliye:** Windows EPERM/EBUSY dosya kilitlerinde veriyi RAM'de tutar; süreç kapanırken (`emergencyFlushSync` ile `beforeExit`, `SIGINT`, `SIGTERM`) senkron diske döker.
+  - **İnsan Onaylı Kural Damıtma:** Kullanıcı retlerinden damıtılan kurallar izole `pendingRules` havuzuna (max 10, 7 gün TTL) alınır; onaylanmadan yürürlüğe girmez.
+- **Manuel AI Köprüsü (Manual AI Bridge):** Yerel model kapalı olduğunda istemleri harici web yapay zekalarına (Gemini, Claude, ChatGPT) kopyala-yapıştır yapabileceğiniz bir formata dönüştürür.
+- **Sıkı Güvenlik ve Sandbox Koruması:**
+  - **Proje Çekirdek Kalkanı:** Ajanın kaynak kodlarına (`src/**`, `server.js`, `package.json`, `.env`, `config/`) erişmesini sert biçimde engeller.
+  - **Programatik Kural İstisna Denetimi:** `checkRuleExceptionMatch` ile `exceptions: []` listesini deterministik olarak doğrular; yanlış pozitif engellemeleri ve model sapmalarını (instruction drift) önler.
+  - **Tripwire Devresi:** `agent_user.json` okunduktan sonra ikinci bir dosya okunmaya kalkışılırsa ajanı acil durdurur (`Emergency Halt`), görev bazlı kilit ve manuel sıfırlama butonu içerir.
+  - **Web Sanitizer:** Web sayfalarındaki gizli DOM ögelerini ve prompt injection tuzaklarını temizler.
+  - **Güvenli Git Staging:** `git add -u` ile yalnızca takip edilen dosyaları commit eder; bellek dosyalarını ve geçici verileri repoya sızdırmaz.
 
 ---
 
-### 3. Küresel Yapay Zeka Ajan Tier Listesi ve Karşılaştırma
+### 3. Mimari İnovasyonlar
 
-Ajan framework'leri ile yapılan karşılaştırmalı performans testlerinde (`agent_karsilastirmalari.md`), **Stellarch Local AI Agent** gizlilik, güvenlik ve yerel kullanım kategorilerinde zirvede yer almaktadır:
-
-#### 🏆 100 Puan Üzerinden Genel Tier List
-
-| Tier | Ajan / Framework | Puan (100) | Öne Çıkan Özellik |
-| :---: | :--- | :---: | :--- |
-| **` S `** | **Antigravity / Cursor / Windsurf** | **94 / 100** | Derin IDE entegrasyonu ve canlı kod indeksleme. |
-| **` S `** | **Stellarch (Local AI Agent)** | **88 / 100** | **%100 Yerel, Sıfır Abonelik, Sandbox Koruması & Manuel AI Köprüsü.** |
-| **` A `** | **CrewAI** | **85 / 100** | Rol tabanlı çoklu ajan işbirliği. |
-| **` A `** | **LangGraph (LangChain)** | **84 / 100** | Çizge (Graph) tabanlı durum yönetimi. |
-| **` A `** | **Cognition Devin** | **83 / 100** | Otonom bulut yazılım geliştirici. |
-| **` B `** | **Microsoft AutoGen** | **79 / 100** | Diyalog tabanlı çoklu ajan mimarisi. |
-| **` B `** | **OpenInterpreter** | **78 / 100** | Yerel kod çalıştırıcı ve terminal ajanı. |
-| **` B `** | **Claude Engineer** | **75 / 100** | CLI tabanlı otonom asistan. |
+1. **Entity Router & Single-Shot Upsert (SGM):** Karmaşık cümlelerdeki farklı varlıkları (kişiler, olaylar) bağımsız döngülere böler. `temperature: 0.1` single-shot üretimi ile eski Best-of-N kör döngülerini kaldırarak gecikmeyi sıfırlar.
+2. **Delta Patch WebSocket Motoru:** Tüm state ağacı yerine yalnızca değişen kısımları (`state_patch`) 150ms debounce ile ileterek CPU ve ağ tasarrufu sağlar.
+3. **5 Katmanlı Araç Çağrı Ayrıştırıcısı:** Markdown kod blokları, ham JSON, XML tag'leri, Qwen sözdizimi ve Heuristic Regex ile küçük modellerde bile araç çağrılarını hatasız ayrıştırır.
+4. **Task Plan Muafiyeti (`isNoTaskPlanMode`):** Manuel Araçlar, Research ve Library modlarında yazılım geliştirme checklist zorunluluğunu kaldırır.
+5. **Gerçek Zamanlı Harcama Muhasebesi ve Bütçe Devre Kesicisi (`costTracker.js`):** Token tüketimini kesin hesaplar; günlük bulut bütçesi `$1.00` aşıldığında aramaları durdurur.
+6. **Sistem Sağlık ve Metrik Takibi:** Her 3 saniyede bir CPU/RAM metrikleri yayını ve `GET /api/health` uç noktası.
 
 ---
 
-### 4. Yerel LLM Model Yetenek Seviyeleri
+### 4. Deterministik Eval ve Test Paketi (Benchmark Suite)
 
-LM Studio üzerinde ajanla birlikte kullanılabilecek model seviyeleri:
+Öznel ve doğrulanamayan puanlama tabloları yerine, Stellarigent doğrudan tekrarlanabilir bir **Deterministik Benchmark & Eval Paketi** (`npm run eval` veya `node evals/run_evals.js`) içerir. Bu test paketi, rastgele model çıktılarına veya dış ağ isteklerine bağımlı olmadan ajanın çekirdek davranışlarını doğrular.
+
+| Test Paketi | Senaryo Sayısı | Kapsanan Alt Sistem | Durum |
+| :--- | :---: | :--- | :---: |
+| **Ayrıştırıcı Dayanıklılığı** | 5 | Markdown kod blokları, ham JSON, XML tag'leri, Qwen sözdizimi, Regex geri çekilmesi | ✅ **BAŞARILI** (5/5) |
+| **Güvenlik ve Yalıtım** | 3 | Çekirdek kalkanı (`src/**`), Dizin atlama engeli (`..`), Ağ dışa sızdırma komut yasağı (`curl`, `irm`) | ✅ **BAŞARILI** (3/3) |
+| **Tripwire Yaşam Döngüsü** | 2 | Sızdırma girişiminde acil durdurma ve görev bazlı kilit, Manuel tripwire sıfırlama ve kurtarma | ✅ **BAŞARILI** (2/2) |
+| **Maliyet ve Kota Takibi** | 2 | Yerel modellerde 0$ kullanım kaydı, Bulut sağlayıcı fiyatlandırma hesabı ve günlük bütçe devresi | ✅ **BAŞARILI** (2/2) |
+| **Bellek Kırpma** | 1 | İki aşamalı matematiksel skor, 24 saatlik koruma dönemi, 50 kural kesin kotası | ✅ **BAŞARILI** (1/1) |
+| **Genel Skor** | **13 Senaryo** | **Bütüncül Sistem Doğrulaması** | **%100.0 Başarı Oranı** |
+
+Test paketini yerel olarak çalıştırmak için:
+```bash
+npm run eval
+```
+
+---
+
+### 5. Yerel LLM Model Yetenek Seviyeleri
 
 | Tier | Model Sınıfı / Boyutu | Performans ve Değerlendirme |
 | :---: | :--- | :--- |
 | **` S `** | **Gemini / Claude / GPT** | **Mükemmel**. Kusursuz çok adımlı planlama, mantık yürütme ve araç seçimi. |
-| **` A `** | **Devstral Small 2 (24B)** | **Çok Başarılı**. Yüksek araç kullanma kapasitesi, çoklu dosya değişikliklerini temiz çözer. |
-| **` B `** | **Qwen 2.5 Coder (14B)** | **Önerilen Varsayılan**. Harika kod sentaksı, güvenilir JSON formatı, hızlı yanıt. |
-| **` C `** | **Gemma 3 (12B)** | **Orta**. Tekli araç çağrılarını düzgün yürütür; çok adımlı mantıkta duraklayabilir. |
-| **` D `** | **Qwen 2.5 Coder (7B)** | **Sınırda**. Hafif donanımlar için uygundur; istemleri net tutun. |
-| **` E `** | **Qwen 2.5 (3B)** | **Zayıf**. Temel araç çağrısı yapar; uzun döngülerde Manuel AI Köprüsü desteği ister. |
-| **` F `** | **Qwen 2.5 (0.5B)** | **Kullanılamaz**. Parametre yetersizliği nedeniyle hatalı JSON üretir. |
+| **` A `** | **Devstral Small 2 (24B)** | **Çok Başarılı**. Yüksek araç kullanma kapasitesi, temiz kod üretimi. |
+| **` B `** | **Qwen 2.5 Coder (14B)** | **Önerilen Varsayılan**. Harika kod sentaksı, güvenilir JSON, hızlı yanıt. |
+| **` C `** | **Gemma 3 (12B)** | **Orta**. Tekli araç çağrılarını düzgün yürütür. |
+| **` D `** | **Qwen 2.5 Coder (7B)** | **Kullanılabilir**. Hafif donanımlar için uygundur. |
+| **` E `** | **Qwen 2.5 (3B)** | **Zayıf**. Temel araç çağrısı yapar; Manuel AI Köprüsü desteği gerekebilir. |
 
 ---
 
-### 5. Modül ve Dizin Haritası
-
-Projeye ait temel modüller ve sorumlulukları (`genel_proje_bilgisi.md`):
+### 6. Modül ve Dizin Haritası
 
 ```
 .
-├── server.js               # Express HTTP ve WebSocket sunucusu, CPU/RAM ölçümleri yayınlayıcı
-├── Dockerfile              # Docker sandbox container tanımı
-├── docker-compose.yml      # Çoklu container orkestrasyonu
-├── package.json            # Node.js bağımlılıkları (express, ws, discord.js, puppeteer)
-├── README.md               # Çift dilli (TR / EN) kapsamlı rehber
-├── agent_readme.md         # Otomatik güncellenen dizin haritası ve görev geçmişi
-├── config/                 # Dinamik yapılandırma dosyaları (JSON şablonları)
-│   ├── config.json         # Admin ID'leri, hız limitleri ve şifreler
-│   ├── kurucu.json         # Kurucu Discord Kullanıcı ID tanımı
-│   ├── permissions.json    # Yetkili Discord kullanıcı listesi
-│   ├── security_rules.json # Yasaklı kelimeler, komutlar ve izin verilen dizinler
-│   └── memory.json         # Görev geçmişi ve vektör veritabanı
-├── src/                    # Çekirdek uygulama mantığı
-│   ├── agent.js            # Ana döngü (runAgentLoop), Swarm modu, onay yöneticisi
-│   ├── state.js            # Global reaktif ajan durumu, WebSocket delta patch motoru
-│   ├── security.js         # Levenshtein kelime tarayıcısı, realpathSync sandbox, risk skorlama
-│   ├── memory.js           # RAG vektör bellek (kosinüs benzerliği) + TF-IDF fallback
+├── server.js               # Express HTTP ve WebSocket sunucusu, /api/health kontrolü, tripwire sıfırlama API
+├── Dockerfile              # Chromium ve Node.js içeren Docker ortamı
+├── docker-compose.yml      # Docker konteyner başlatma ayarları
+├── package.json            # Bağımlılıklar, eval ve test npm scriptleri
+├── README.md               # Çift dilli kapsamlı proje rehberi
+├── genel_proje_bilgisi.md  # Detaylı mimari harita ve referans dokümanı
+├── agent_readme.md         # Otomatik güncellenen dosya haritası ve görev günlüğü
+├── bundle_docs.py          # Tüm dokümantasyonu tek dosyada birleştiren Python betiği
+├── bundled_documentation.md# Birleştirilmiş tüm dokümantasyon
+├── evals/                  # Deterministik eval ve benchmark test paketi
+│   ├── run_evals.js        # Test çalıştırıcı ve markdown rapor üretici
+│   ├── scenarios.js        # 5 alt sistemde 13 deterministik test senaryosu
+│   └── latest_eval_report.md# En son benchmark yürütme raporu
+├── config/                 # Dinamik JSON yapılandırma dosyaları
+│   ├── config.json         # Modeller, API merdiveni, model etiketleri, bütçe limiti, mod profilleri
+│   ├── security_rules.json # Yasaklı kelimeler, komutlar ve izinli dizinler
+│   ├── setup.json          # İlk kurulum sihirbazı durumu
+│   ├── memory.json         # Vektörel görev hafızası ve onay bekleyen güvenlik kuralları (50 limit, İki Aşamalı Kırpma)
+│   └── system_prompts.json # 16 sistem ve mikro-prompt
+├── src/                    # Çekirdek sistem kodları
+│   ├── agent.js            # Ana döngü, Swarm geçişleri, tekil araç çalıştırıcı, kural damıtma
+│   ├── state.js            # Global state, delta diff patch motoru, harcama metrikleri, geçici hata buffer'ı
+│   ├── security.js         # Çekirdek kalkanı, görev bazlı tripwire devresi, resetTripwire, veri sızdırma engeli
+│   ├── memory.js           # Asenkron kuyruklu bellek, İki Aşamalı Kırpma, EPERM koruması, güvenli git staging (git add -u)
 │   ├── llm/
-│   │   └── llmClient.js    # LM Studio istemcisi, retry backoff, 5 formatlı ayrıştırıcı
-│   ├── tools/              # Sistem komutları, Puppeteer tarayıcısı, dosya işlemleri
-│   ├── ws/                 # WebSocket mesaj işleyici
-│   └── discord/            # Discord bot istemcisi, müzik çalar (yt-dlp)
-└── WikiLike/               # Obsidian uyumlu wiki dokümantasyonu
+│   │   ├── llmClient.js    # 5 katmanlı ayrıştırıcı, failover, dinamik sistem promptu, bütçe devre kesicisi
+│   │   ├── costTracker.js  # Gerçek zamanlı token ve maliyet takibi, çoklu sağlayıcı tarife kartları, günlük kota
+│   │   └── modelManager.js # LM Studio REST API, lms CLI, model routing ve ladder
+│   ├── modes/
+│   │   └── libraryMode.js  # Entity router, single-shot upsert, kütüphane alt döngüsü
+│   ├── security/
+│   │   └── webSanitizer.js # Web içeriği temizleme ve prompt injection kalkanı
+│   ├── tools/              # 21 temel araç modülü (ortam değişkeni temizleme ve sandbox korumalı)
+│   └── discord/            # Discord botu, yt-dlp müzik çalar, onay köprüsü
+├── electron/               # Electron Masaüstü IDE
+│   ├── main.js             # Electron ana süreci, dinamik PORT okuyucu
+│   ├── index.html          # Yerel Monaco Editor arayüzü
+│   └── ide.js              # Dosya gezgini ve ajan konsolu
+└── WikiLike/               # Obsidian uyumlu derin teknik wiki dokümanları
 ```
 
 ---
 
-### 6. Kurulum Gereksinimleri
+### 7. Kullanılabilir Araçlar (Tam 22 Araç Envanteri)
 
-Uygulamayı çalıştırmadan önce:
-
-1. **Node.js** (v18.0.0 veya üzeri).
-2. **LM Studio** kurulu olmalı ve API Sunucusu açık olmalıdır (`http://localhost:1234`).
-3. Bilgisayarınızda **Google Chrome / Chromium** kurulu olmalıdır (Puppeteer web taraması için).
-4. *(İsteğe Bağlı)* Discord entegrasyonu için bir **Discord Bot Tokenı**.
+1. **`execute_command`**: Yalıtılmış çalışma alanında ve temizlenmiş ortam değişkenleriyle PowerShell veya Bash çalıştırır.
+2. **`open_application`**: Masaüstü uygulamasını veya dosyasını başlatır.
+3. **`web_search`**: DuckDuckGo / Yahoo ile web araması yapar.
+4. **`view_website`**: Web sayfasını Puppeteer veya Axios ile ziyaret eder ve injection'lardan temizler.
+5. **`deep_web_search`**: Çoklu URL araştırması yapar, `llmFetch` ile özetler ve atıflı master rapor çıkarır.
+6. **`read_file`**: İzinli sınırlar içindeki dosya içeriğini okur.
+7. **`read_pdf`**: PDF belgelerinden metin içeriğini ayrıştırır.
+8. **`write_file`**: `scratch/` veya `By_Agent/` içinde dosya oluşturur veya yazar.
+9. **`list_directory`**: Klasör içeriğini listeler (Korumalı çekirdek dosyalar maskelenir).
+10. **`take_screenshot`**: Masaüstü ekran görüntüsü alır ve `public/` altına kaydeder.
+11. **`download_image`**: Web URL'sinden görsel indirir; vision ile doğrular.
+12. **`task_plan`**: Görevin adımlarını planlayarak checklist oluşturur.
+13. **`select_guide`**: Obsidian kılavuzunu aktif sistem promptuna bağlar.
+14. **`task_complete`**: Görevi tamamlar, hafızayı günceller ve güvenli `git add -u && git commit` yürütür.
+15. **`generate_workspace_rules`**: `.agent-rules.md` kurallarını otomatik üretir.
+16. **`send_discord_message`**: Discord kanalına mesaj veya dosya eki gönderir.
+17. **`filter_output`**: Büyük araç çıktılarını satır, URL veya tırnak içeriğine göre filtreler.
+18. **`url_image_reader`**: Sayfadaki görselleri vision modeli ile analiz eder.
+19. **`extract_chart_data`**: Finansal grafik ve tablo görsellerini JSON koordinat dizisine çevirir.
+20. **`line_checker`**: Büyük dosyalarda sorguya uyan satırları token tasarrufuyla listeler.
+21. **`library_mode`**: `Libraries/` dizinindeki bilgi tabanında semantik arama yapar.
+22. **`notify_user`**: Görev tamamlanması, hata veya uyarı durumlarında işletim sistemi masaüstü toast bildirimi (Windows PowerShell balloon, macOS osascript, Linux notify-send) gönderir.
 
 ---
 
-### 7. Yapılandırma Rehberi (Adım Adım)
+### 8. Kullanıcı Arayüzleri: Web Paneli ve Electron IDE
 
-#### 1. Adım: `.env` Oluşturma
-`.env.example` dosyasını `.env` olarak kopyalayın:
+#### Web Paneli (`http://localhost:3000`)
+- **Sol Akordeon Menü:** **Manuel Tools**, **Research**, **Library** ve **Agent Runner** modları arasında hızlı geçiş, anlık Token ve Tahmini Maliyet göstergeleri.
+- **Konsolide 6 Sekmeli Ayarlar Merkezi:**
+  1. `Guide Manager`: Özel çalışma kılavuzları için Markdown editörü.
+  2. `Models & Routing`: **LM Studio** yerel uç nokta ve etiketleme, **Bulut API Anahtarları** (OpenAI, Anthropic, Gemini, Groq) ve **Model Yönlendirme / Merdiveni** için alt sekmeli birleşik merkez.
+  3. `Prompts`: 16 sistem promptu için canlı düzenleyici, sıfır yedekli doğrudan kayıt ve akış şeması (`system_prompts_algorithm.svg`).
+  4. `Auto & Budget`: Araç bazlı otomatik onay izinleri, LPM ayarları ve günlük bulut harcama limiti (`maxDailyCostUSD`).
+  5. `Discord`: Token, Kurucu ID, hız limitleri ve yetkili kullanıcı listesi.
+  6. `Security & Perm`: Yasaklı kabuk komutları kara listesi yönetimi ve Güvenlik Tripwire kilidini sıfırlama butonu.
+
+#### Electron Masaüstü IDE (`npm run start:ide`)
+- Yerel `node_modules/monaco-editor` ile tamamen offline çalışan Monaco Editor.
+- `.env` dosyasındaki `PORT` ile otomatik senkronizasyon.
+- Entegre dosya ağacı ve ajan görev çubuğu.
+
+---
+
+### 9. Kurulum Gereksinimleri
+
+1. **Node.js** (v18.0.0 veya üzeri).
+2. **LM Studio** kurulu ve API Sunucusu açık (`http://localhost:1234`).
+3. Web taramaları için bilgisayarda **Google Chrome / Chromium**.
+4. *(İsteğe Bağlı)* Discord Bot Tokenı ve Kurucu Discord Kullanıcı ID'si.
+
+---
+
+### 10. Yapılandırma Rehberi (Adım Adım)
+
+#### 1. Adım: `.env` Dosyası Oluşturma
 ```bash
 cp .env.example .env
 ```
 Gerekli alanları doldurun:
 ```env
-DISCORD_TOKEN=bot_tokeninizi_yazin
 PORT=3000
-FOUNDER_DISCORD_ID=discord_id nizi_yazin
 FOUNDER_KEY=PANEL_SIFRENIZ
+DISCORD_TOKEN=BOT_TOKENINIZ
+FOUNDER_DISCORD_ID=DISCORD_KULLANICI_IDNIZ
 ```
 
-#### 2. Adım: `config/kurucu.json`
-Şablonu kopyalayın ve Discord Kullanıcı ID'nizi girin:
+#### 2. Adım: Bağımlılıkları Yükleme
 ```bash
-cp config/kurucu.example.json config/kurucu.json
-```
-```json
-{
-  "founder": "DISCORD_ID_NIZI_YAZIN"
-}
-```
-
-#### 3. Adım: `config/config.json`
-Şablonu kopyalayın, admin yetkilerini ve panel şifrenizi tanımlayın:
-```bash
-cp config/config.example.json config/config.json
-```
-```json
-[
-  {
-    "admins": ["DISCORD_ID_NIZI_YAZIN"],
-    "connectionSpeedLimit": 0.7,
-    "founderKey": "GUVENLI_BIR_SIFRE_BELIRLEYIN"
-  }
-]
-```
-
-#### 4. Adım: `config/permissions.json`
-Şablonu kopyalayın ve yetkili Discord kullanıcı etiketlerini ekleyin:
-```bash
-cp config/permissions.example.json config/permissions.json
-```
-```json
-[
-  {
-    "authorizedUsers": ["<@DISCORD_ID_NIZI_YAZIN>"]
-  }
-]
+npm install
 ```
 
 ---
 
-### 8. Uygulamayı Çalıştırma ve Docker
+### 11. Uygulamayı Çalıştırma ve Docker
 
-#### Yerel Node.js ile Çalıştırma
-1. Bağımlılıkları yükleyin:
-   ```bash
-   npm install
-   ```
-2. Sunucuyu başlatın:
-   ```bash
-   npm start
-   ```
-3. Tarayıcınızdan `http://localhost:3000` adresini açarak Web Paneline erişin.
+#### Web Panelini, Arka Planı ve İnteraktif Terminal CLI'yı Başlatma:
+```bash
+npm start
+```
+Tarayıcınızdan `http://localhost:3000` adresine gidebilir veya sistemi doğrudan konsol üzerinden **İnteraktif Terminal Kontrolcüsü** ile yönetebilirsiniz!
 
-#### Docker Sandbox ile Çalıştırma
-İzole ortamda başlatmak için:
+#### 💻 İnteraktif Konsol / Terminal Kontrolcüsü (Terminal CLI)
+`npm start` çalıştırıldığında arkaplanda Express ve WebSocket çalışırken standart girdi/çıktı üzerinde dinamik bir komut istemcisi (`Stellarigent [mod/alt-mod | durum]> `) devreye girer. Hem geliştirici hem de test otomasyonu sistemi konsoldan bütünüyle kontrol edebilir:
+
+- **Menüler ve Modlar Arası Geçiş:**
+  - `:menu` veya `:help`: Kullanılabilir tüm komut ve modları listeler.
+  - `:mode <agent|manuel|research|library>`: Otonom Swarm Geliştirici, Doğrudan Araç Yürütme, Web/Yerel Araştırma ve Hafıza Yönetimi modları arasında geçiş yapar.
+  - `:submode <ad>`: Alt modu belirler (örn: `cmd_tool`, `file_reader`, `file_writer`, `deep_web`, `web`).
+- **Ayar Yapılandırma ve Çalışma Zamanı Değişiklikleri:**
+  - `:settings` veya `:config`: LM Studio adresi, aktif model, sıcaklık, maksimum adım, HPM/LPM durumları ve bütçe metriklerini formatlı ASCII tablosunda gösterir.
+  - `:set <anahtar> <değer>`: Ayarları anında günceller (örn: `:set temperature 0.3`, `:set maxSteps 50`, `:set hpmMode true`).
+  - `:autoapprove <araç> <true|false>`: Belirli araçlar için otomatik onay iznini açar veya kapatır.
+  - `:models` & `:switch-model <modelId>`: LM Studio'da yüklü modelleri listeler ve aktif modeli anında değiştirir.
+  - `:tripwire reset`: Güvenlik Tripwire devre kesicisini anında sıfırlar.
+- **Görev Yürütme, Müdahale ve Onay:**
+  - Komut satırına doğrudan herhangi bir görev yazmak (veya `:task <metin>`): Aktif modda görevi hemen başlatır.
+  - `:interrupt <talimat>`: Görev yürütülürken araya yeni talimat enjekte eder.
+  - `:abort`: Çalışan görevi ve işletim sistemi alt süreçlerini derhal sonlandırır.
+  - **İnteraktif Araç Onay Kartı:** Bir araç onay beklediğinde (`pending_approval`) terminalde renkli onay kutusu çıkar (`displayApprovalCard`). Onaylamak için `y` / `:approve`, reddetmek için `n [gerekçe]` / `:reject [gerekçe]`, parametre değiştirmek için `:edit <json>` yazılır.
+- **Teşhis ve Sistem Doğrulama:**
+  - `:status`: Anlık durum, görev adımları kontrol listesi, son düşünceler ve çalıştırılan araçları gösterir.
+  - `:history [n]`: Son $n$ sohbet mesajını döker.
+  - `:health`: Sistem sağlık kontrolünü (`/api/health`) çalıştırır.
+  - `:eval`: 13 senaryolu deterministik benchmark test paketini (`npm run eval`) doğrudan konsolda koşturur.
+  - `:clear`: Sohbet geçmişini temizler ve ajanı sıfırlar.
+  - `:exit` veya `:quit`: Sunucuyu kapatıp çıkar.
+
+#### Electron Masaüstü IDE'yi Başlatma:
+```bash
+npm run start:ide
+```
+
+#### Deterministik Benchmark Testlerini Çalıştırma:
+```bash
+npm run eval
+```
+
+#### Docker İle Çalıştırma:
 ```bash
 docker-compose up --build
 ```

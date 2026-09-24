@@ -55,6 +55,8 @@ Available Tools:
    - Deep Web Search tool. Searches multiple pages and returns a comprehensive aggregated summary.
 20. {"action": "extract_chart_data", "path": "file_path", "explanation": "why"}
    - Extracts stock/financial chart data (lines/candlesticks) from a local screenshot image file and converts it into a structured JSON array of numbers.
+21. {"action": "notify_user", "title": "Bildirim Başlığı", "message": "Kullanıcıya iletmek istediğin mesaj", "level": "info|warning|error", "explanation": "why"}
+   - Sends a Windows/macOS/Linux system toast notification to alert the user. Use when a long task is done, when something important happens mid-task, or when user attention is needed. 'level' can be 'info' (green), 'warning' (yellow), or 'error' (red). (Uzun süren görevlerde, bitince veya kritik bir olay olduğunda kullanıcıya bildirim göndermek için kullan.)
 
 IMPORTANT GUIDELINES:
 - Bir bilgiyi ararken, daima öncelikle her zaman "library_mode" toolunu kullanmalısın. Eğer bilgiyi local veri olan "library_mode" toolu ile bulamazsan, o zaman "web_search" toolunu kullanabilirsin. Eğer "library_mode" toolundan yine bir sonuç gelmezse, o zaman "web_search" toolunu kullanabilirsin.

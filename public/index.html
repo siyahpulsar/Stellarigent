@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Local AI Computer Agent | Controller</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="setup.css">
   <!-- Google Fonts Outfit & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,7 +17,7 @@
     <header class="app-header">
       <div class="logo-section">
         <div class="logo-icon"></div>
-        <h1>Local AI Agent</h1>
+        <h1>Stellarigent</h1>
         <span class="logo-tag">LM Studio</span>
         <span class="logo-tag" id="active-mode-tag">Mode: None</span>
         <select id="ui-mode-select" class="mode-select">
@@ -101,39 +102,32 @@
             </div>
           </div>
 
+          <!-- High Parameter Mode Toggle -->
+          <div class="hpm-toggle-card" id="hpm-toggle-card" title="30B+ parametreli modeller için LPM/OM batch çağrılarını devre dışı bırakır. Tek konsolide LLM çağrısı yapar.">
+            <div class="hpm-toggle-left">
+              <span class="hpm-icon">⚡</span>
+              <div class="hpm-label-group">
+                <span class="hpm-label">High Param Mode</span>
+                <span class="hpm-sublabel" id="hpm-sublabel">30B+ modeller için</span>
+              </div>
+            </div>
+            <label class="hpm-switch" title="HPM: LPM ve OM batch çağrılarını atla">
+              <input type="checkbox" id="hpm-toggle-checkbox">
+              <span class="hpm-slider"></span>
+            </label>
+          </div>
+
           <hr class="nav-divider">
 
           <button class="nav-btn active" data-tab="chat">
             <span class="icon">💬</span> Chat View
           </button>
-          <button class="nav-btn" data-tab="terminal">
-            <span class="icon">💻</span> Live Terminal
-          </button>
           <button class="nav-btn" data-tab="settings">
             <span class="icon">⚙️</span> Settings
-          </button>
-          <button class="nav-btn" data-tab="discord">
-            <span class="icon">🤖</span> Discord Bot
-          </button>
-          <button class="nav-btn" data-tab="admin">
-            <span class="icon">👑</span> Admin
-          </button>
-          <button class="nav-btn" data-tab="help">
-            <span class="icon">❓</span> Docs
           </button>
           <button class="nav-btn" id="btn-open-ide" style="margin-top: 10px; background: rgba(30,144,255,0.2); border: 1px solid rgba(30,144,255,0.5);">
             <span class="icon">🖥️</span> Open IDE App
           </button>
-        </div>
-
-        <!-- Working Directory Card -->
-        <div class="sidebar-card directory-card">
-          <h3>Working Directory</h3>
-          <div class="cwd-display" id="cwd-display">d:\ai\aiAgentLocal</div>
-          <div class="cwd-change-row">
-            <input type="text" id="cwd-input" placeholder="Change path...">
-            <button id="cwd-btn">Update</button>
-          </div>
         </div>
 
         <!-- Task Execution Plan Checklist -->
@@ -167,6 +161,10 @@
             <span>Safety Blocks</span>
             <span id="stat-blocks">0</span>
           </div>
+          <div class="stat-row">
+            <span>Estimated Cost</span>
+            <span id="stat-cost" style="color: var(--color-success, #10b981); font-weight: 600;">$0.0000</span>
+          </div>
         </div>
       </aside>
 
@@ -179,7 +177,7 @@
             <!-- Messages Log -->
             <div class="chat-messages" id="chat-messages">
               <div class="system-welcome">
-                <h2>Welcome to LM Studio Local AI Agent!</h2>
+                <h2>Welcome to Stellarigent!</h2>
                 <p>Ensure your LM Studio Local Server is turned <strong>ON</strong> and a model is loaded. Type a task below to let the agent perform local operations.</p>
                 <div class="examples-grid">
                   <button class="example-btn">"Open notepad and write a python script"</button>
@@ -224,6 +222,22 @@
                 </div>
               </div>
             </div>
+
+            <!-- ═══ TASK LIVE PANEL ═══════════════════════════════════════ -->
+            <div class="task-live-panel hidden" id="task-live-panel">
+              <div class="tlp-header">
+                <span class="tlp-icon">⚡</span>
+                <span class="tlp-title">Canlı Görev Akışı</span>
+                <span class="tlp-counter" id="tlp-counter">0 adım</span>
+                <button class="tlp-collapse-btn" id="tlp-collapse-btn" title="Paneli küçült/büyüt">▾</button>
+              </div>
+              <div class="tlp-body" id="tlp-body">
+                <div class="tlp-steps" id="tlp-steps">
+                  <!-- Steps injected dynamically by app.js -->
+                </div>
+              </div>
+            </div>
+            <!-- ═══════════════════════════════════════════════════════════ -->
 
             <!-- Active Thinking Bar / Abort task -->
             <div class="thinking-indicator-row hidden" id="thinking-row">
@@ -285,12 +299,11 @@
               <div class="chat-input-container" style="position: relative; flex: 1; display: flex;">
                 <button type="button" id="btn-toggle-tts" class="btn" title="Toggle Text-to-Speech" style="margin-right: 5px; font-size: 1.2rem; background: transparent; border: none; cursor: pointer;">🔊</button>
                 <button type="button" id="btn-voice-command" class="btn" title="Hold to speak (STT)" style="margin-right: 5px; font-size: 1.2rem; background: transparent; border: none; cursor: pointer;">🎙️</button>
-                <input type="text" id="chat-input" placeholder="Describe the task you want the local AI agent to perform..." autocomplete="off" style="width: 100%;">
+                <input type="text" id="chat-input" placeholder="Describe the task you want Stellarigent to perform..." autocomplete="off" style="width: 100%;">
                 <div class="mention-popup hidden" id="mention-popup"></div>
               </div>
               <button type="submit" class="btn btn-send" id="btn-send">Send</button>
             </form>
-          </div>
           </div>
 
           <!-- Deep Web Search Panel (Right Side Drawer) -->
@@ -397,232 +410,698 @@
           </div>
         </div>
 
-        <!-- Tab 3: Configuration & Banned Commands -->
+        <!-- Tab 3: Configuration & Settings (Two-Pane Sub-Navigation) -->
         <div class="tab-panel" id="panel-settings">
-          <div class="settings-layout">
-            <h2>Safety & Connections Settings</h2>
-            
-            <div class="settings-grid">
-              <!-- Obsidian Library Guide Manager & Editor -->
-              <div class="settings-card guide-editor-card">
-                <h3>Obsidian Library Guide Manager & Editor</h3>
-                <p class="whitelist-info">Select a guide to load and edit, or write a new custom guide below.</p>
-                <div class="input-group">
-                  <label for="editor-guide-select">Select Guide to Edit</label>
-                  <select id="editor-guide-select" class="theme-select">
-                    <option value="">-- Create New Guide --</option>
-                  </select>
-                </div>
-                <div class="input-group">
-                  <label for="editor-guide-name">Guide Filename</label>
-                  <input type="text" id="editor-guide-name" placeholder="custom_guide.md">
-                </div>
-                <div class="input-group">
-                  <label for="editor-guide-content">Guide Instructions (Markdown)</label>
-                  <textarea id="editor-guide-content" class="guide-textarea" rows="5" placeholder="# Custom Instructions Guide..."></textarea>
-                </div>
-                <div class="guide-editor-actions">
-                  <button type="button" class="btn btn-save-guide" id="btn-save-guide">Save Guide File</button>
-                </div>
+          <div class="settings-subnav-container">
+            <!-- Left Subnav Sidebar (Immediately right of the main left sidebar) -->
+            <aside class="settings-subnav">
+              <div class="settings-subnav-header">
+                <h3>Settings</h3>
               </div>
+              <div class="settings-subnav-menu">
+                <button type="button" class="settings-subnav-btn active" data-settings-tab="guide">
+                  <span class="subnav-icon">📖</span>
+                  <span>Guide Manager</span>
+                </button>
+                <button type="button" class="settings-subnav-btn" data-settings-tab="models">
+                  <span class="subnav-icon">🤖</span>
+                  <span>Models & Routing</span>
+                </button>
+                <button type="button" class="settings-subnav-btn" data-settings-tab="prompts">
+                  <span class="subnav-icon">📝</span>
+                  <span>System Prompts</span>
+                </button>
+                <button type="button" class="settings-subnav-btn" data-settings-tab="auto">
+                  <span class="subnav-icon">⚡</span>
+                  <span>Auto & Budget</span>
+                </button>
+                <button type="button" class="settings-subnav-btn" data-settings-tab="discord">
+                  <span class="subnav-icon">💬</span>
+                  <span>Discord</span>
+                </button>
+                <button type="button" class="settings-subnav-btn" data-settings-tab="perm">
+                  <span class="subnav-icon">🛡️</span>
+                  <span>Security & Perm</span>
+                </button>
+              </div>
+            </aside>
 
-              <!-- LM Studio Connection -->
-              <div class="settings-card">
-                <h3>Local AI Endpoint (LM Studio)</h3>
-                <div class="input-group">
-                  <label for="setting-url">LM Studio Server URL</label>
-                  <input type="text" id="setting-url" value="http://127.0.0.1:1234/v1">
+            <!-- Right Content Area -->
+            <main class="settings-subcontent">
+              <!-- 1. Guide Manager -->
+              <section class="settings-subpanel active" id="settings-subpanel-guide">
+                <div class="subpanel-header">
+                  <h2>Guide Manager & Editor</h2>
+                  <p class="whitelist-info">Select a guide to load and edit, or write a new custom guide below.</p>
                 </div>
-                <div class="input-group">
-                  <label for="setting-model">Model Name Override</label>
-                  <input type="text" id="setting-model" value="qwen2.5-coder-7b-instruct">
-                  <small>Leave as default or set to match loaded model ID.</small>
-                </div>
-                <div class="settings-row">
+                <div class="settings-card guide-editor-card">
                   <div class="input-group">
-                    <label for="setting-temp">Temperature</label>
-                    <input type="number" id="setting-temp" min="0" max="1" step="0.1" value="0.2">
+                    <label for="editor-guide-select">Select Guide to Edit</label>
+                    <select id="editor-guide-select" class="theme-select">
+                      <option value="">-- Create New Guide --</option>
+                    </select>
                   </div>
                   <div class="input-group">
-                    <label for="setting-steps">Max Steps limit</label>
-                    <input type="number" id="setting-steps" min="1" max="50" value="15">
+                    <label for="editor-guide-name">Guide Filename</label>
+                    <input type="text" id="editor-guide-name" placeholder="custom_guide.md">
                   </div>
-                </div>
-              </div>
-
-              <!-- Fallback API Providers -->
-              <div class="settings-card">
-                <h3>Fallback API Providers (Cloud LLMs)</h3>
-                <p class="whitelist-info">If LM Studio fails, the agent will try these APIs in order. (Format: Bearer/API Key)</p>
-                <div class="input-group">
-                  <label for="setting-api-openai">1. OpenAI API Key</label>
-                  <input type="password" id="setting-api-openai" placeholder="sk-proj-...">
-                </div>
-                <div class="input-group">
-                  <label for="setting-api-anthropic">2. Anthropic API Key</label>
-                  <input type="password" id="setting-api-anthropic" placeholder="sk-ant-...">
-                </div>
-                <div class="input-group">
-                  <label for="setting-api-gemini">3. Google Gemini API Key</label>
-                  <input type="password" id="setting-api-gemini" placeholder="AIzaSy...">
-                </div>
-                <div class="input-group">
-                  <label for="setting-api-groq">4. Groq API Key</label>
-                  <input type="password" id="setting-api-groq" placeholder="gsk_...">
-                </div>
-                <small style="color:var(--text-muted);">The fallback priority is: OpenAI -> Anthropic -> Gemini -> Groq. Leave blank to skip.</small>
-              </div>
-
-              <!-- Safety / System Prompt -->
-              <div class="settings-card">
-                <h3>System Prompt Settings</h3>
-                <div class="input-group">
-                  <label for="setting-prompt">Custom Instructions</label>
-                  <textarea id="setting-prompt" rows="4"></textarea>
-                </div>
-              </div>
-
-              <!-- LPM (Low Parameter Mode) Settings -->
-              <div class="settings-card">
-                <h3>Low Parameter Mode (LPM) Settings</h3>
-                <div class="setting-item-toggle">
-                  <label class="switch-container">
-                    <input type="checkbox" id="setting-lpm">
-                    <span class="switch-slider"></span>
-                    <span class="switch-label">Enable LPM (Low Parameter Mode)</span>
-                  </label>
-                </div>
-                <div class="setting-item-toggle" id="lpm-om-container" style="display:none; margin-top: 10px; margin-left: 20px;">
-                  <label class="switch-container">
-                    <input type="checkbox" id="setting-lpm-om">
-                    <span class="switch-slider"></span>
-                    <span class="switch-label">Enable LPM OM (Odaklanma Modu)</span>
-                  </label>
-                </div>
-                <div class="input-group" id="lpm-batch-container" style="display:none; margin-top: 15px; margin-left: 20px;">
-                  <label for="setting-lpm-batch" style="margin-bottom: 5px;">LPM Batch Size (Tools per query)</label>
-                  <div style="display: flex; align-items: center;">
-                    <input type="range" id="setting-lpm-batch" min="1" max="18" value="1" oninput="document.getElementById('lpm-batch-val').innerText = this.value" style="flex: 1;">
-                    <span id="lpm-batch-val" style="font-weight: bold; margin-left: 10px; width: 25px; text-align: center;">1</span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Swarm & Whitelist Settings -->
-              <div class="settings-card">
-                <h3>Swarm & Auto-Approval Settings</h3>
-                <div class="setting-item-toggle">
-                  <label class="switch-container">
-                    <input type="checkbox" id="setting-swarm">
-                    <span class="switch-slider"></span>
-                    <span class="switch-label">Enable Swarm Mode (Multi-Agent Team)</span>
-                  </label>
-                </div>
-                <div class="whitelist-group">
-                  <h4>Granular Auto-Approvals</h4>
-                  <p class="whitelist-info">Select low-risk actions to auto-approve without waiting for manual confirmation.</p>
-                  <div class="checkbox-list">
-                    <label class="checkbox-container">
-                      <input type="checkbox" id="approve-read_file">
-                      <span class="checkbox-label">Read File (`read_file`)</span>
-                    </label>
-                    <label class="checkbox-container">
-                      <input type="checkbox" id="approve-write_file">
-                      <span class="checkbox-label">Write/Edit File (`write_file`)</span>
-                    </label>
-                    <label class="checkbox-container">
-                      <input type="checkbox" id="approve-list_directory">
-                      <span class="checkbox-label">List Directory (`list_directory`)</span>
-                    </label>
-                    <label class="checkbox-container">
-                      <input type="checkbox" id="approve-web_search">
-                      <span class="checkbox-label">Web Search (`web_search`)</span>
-                    </label>
-                    <label class="checkbox-container">
-                      <input type="checkbox" id="approve-view_website">
-                      <span class="checkbox-label">View Website (`view_website`)</span>
-                    </label>
-                    <label class="checkbox-container">
-                      <input type="checkbox" id="approve-open_application">
-                      <span class="checkbox-label">Open GUI App (`open_application`)</span>
-                    </label>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Banned Commands List -->
-            <div class="settings-card banned-card">
-              <h3>Banned Shell Commands Blacklist</h3>
-              <p>Commands containing these exact phrases or expressions will be blocked automatically by the backend before reaching the approval dialog.</p>
-              <div class="banned-badges" id="banned-badges">
-                <!-- Badges dynamically rendered here -->
-              </div>
-              <div class="add-banned-row">
-                <input type="text" id="new-banned-input" placeholder="e.g. rm -rf">
-                <button class="btn btn-add-banned" id="btn-add-banned">Add Blacklist Item</button>
-              </div>
-            </div>
-
-            <div class="settings-actions">
-              <button class="btn btn-save" id="btn-save-settings">Save & Apply Settings</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Tab 3.5: Discord Bot Settings -->
-        <div class="tab-panel" id="panel-discord">
-          <div class="settings-layout">
-            <h2>Discord Bot Management</h2>
-            
-            <div class="settings-grid">
-              <!-- Bot General Settings -->
-              <div class="settings-card">
-                <h3>Bot Configuration</h3>
-                <div class="settings-row">
                   <div class="input-group">
-                    <label for="discord-status">Bot Status</label>
-                    <div class="bot-status-container" style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
-                      <span class="status-dot offline" id="discord-bot-status-dot" style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 8px #ef4444;"></span>
-                      <span id="discord-bot-status-text" style="font-weight: 500; color: #ef4444;">Offline</span>
+                    <label for="editor-guide-content">Guide Instructions (Markdown)</label>
+                    <textarea id="editor-guide-content" class="guide-textarea" rows="12" placeholder="# Custom Instructions Guide..."></textarea>
+                  </div>
+                  <div class="guide-editor-actions">
+                    <button type="button" class="btn btn-save-guide" id="btn-save-guide">Save Guide File</button>
+                  </div>
+                </div>
+              </section>
+
+              <!-- 2. Consolidated Models & Routing Panel -->
+              <section class="settings-subpanel" id="settings-subpanel-models">
+                <div class="subpanel-header">
+                  <h2>Modeller & Sağlayıcılar (Models & Routing)</h2>
+                  <p class="whitelist-info">Yerel LM Studio bağlantısını, bulut API anahtarlarını ve araç bazlı model yönlendirmelerini tek merkezden yönetin.</p>
+                </div>
+
+                <div class="models-nav-tabs">
+                  <button type="button" class="models-nav-btn active" data-models-pane="lmstudio">
+                    <span>🤖</span> LM Studio (Yerel)
+                  </button>
+                  <button type="button" class="models-nav-btn" data-models-pane="apikeys">
+                    <span>🔑</span> Cloud API Keys
+                  </button>
+                  <button type="button" class="models-nav-btn" data-models-pane="modelrouting">
+                    <span>🔀</span> Model Routing Table
+                  </button>
+                </div>
+
+                <!-- Pane A: LM Studio -->
+                <div class="models-pane active" id="models-pane-lmstudio">
+                  <form onsubmit="return false;" autocomplete="off">
+                    <div class="settings-grid">
+                      <div class="settings-card">
+                        <h3>Local AI Endpoint (LM Studio)</h3>
+                        <div class="input-group">
+                          <label for="setting-url">LM Studio Server URL</label>
+                          <input type="text" id="setting-url" name="lmstudio_url" value="http://127.0.0.1:1234/v1" autocomplete="off">
+                        </div>
+                        <div class="input-group">
+                          <label for="setting-model">Model Name Override</label>
+                          <input type="text" id="setting-model" name="lmstudio_model" value="qwen2.5-coder-7b-instruct" autocomplete="off">
+                          <small>Leave as default or set to match loaded model ID.</small>
+                        </div>
+                        <div class="settings-row">
+                          <div class="input-group">
+                            <label for="setting-temp">Temperature</label>
+                            <input type="number" id="setting-temp" name="lmstudio_temp" min="0" max="1" step="0.1" value="0.2" autocomplete="off">
+                          </div>
+                          <div class="input-group">
+                            <label for="setting-steps">Max Steps limit</label>
+                            <input type="number" id="setting-steps" name="lmstudio_steps" min="1" max="50" value="15" autocomplete="off">
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="settings-card">
+                        <h3>AI Modelleri ve İş Yükü Etiketleri</h3>
+                        <p class="whitelist-info">Daha önce çalıştırılan modelleri "Hızlı", "Orta İşler" veya "Yüklü İşler" olarak etiketleyin. Bir model için birden fazlası seçilebilir.</p>
+                        <div class="lm-models-container" id="lmstudio-models-list">
+                          <!-- Rendered dynamically by settings.js -->
+                        </div>
+                        <div class="add-banned-row" style="margin-top: 15px;">
+                          <input type="text" id="new-lm-model-input" placeholder="Örn: qwen2.5-14b-instruct" autocomplete="off">
+                          <button type="button" class="btn btn-add-banned" id="btn-add-lm-model">Add Model</button>
+                        </div>
+                        <div style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                          <span id="model-tags-save-status" style="font-size: 0.8rem; color: var(--text-muted, #888);">Değişiklikler anında diske kaydedilir.</span>
+                          <button type="button" class="btn btn-save" id="btn-save-model-tags" style="font-size: 0.85rem; padding: 6px 14px;">Modelleri ve Etiketleri Kaydet</button>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="settings-actions">
+                      <button type="button" class="btn btn-save" id="btn-save-lmstudio">Save LM Studio Settings</button>
+                    </div>
+                  </form>
+                </div>
+
+                <!-- Pane B: Cloud API Keys -->
+                <div class="models-pane" id="models-pane-apikeys">
+                  <form onsubmit="return false;" autocomplete="off">
+                    <div class="settings-grid">
+                      <div class="settings-card">
+                        <h3>Fallback API Providers (Cloud LLMs)</h3>
+                        <div class="input-group">
+                          <label for="setting-api-gemini">Google Gemini API Key</label>
+                          <input type="password" id="setting-api-gemini" name="gemini_api_key" placeholder="AIzaSy..." autocomplete="new-password" data-lpignore="true" data-1p-ignore="true" data-form-type="other">
+                        </div>
+                        <div class="input-group">
+                          <label for="setting-api-openai">OpenAI (GPT) API Key</label>
+                          <input type="password" id="setting-api-openai" name="openai_api_key" placeholder="sk-proj-..." autocomplete="new-password" data-lpignore="true" data-1p-ignore="true" data-form-type="other">
+                        </div>
+                        <div class="input-group">
+                          <label for="setting-api-anthropic">Anthropic (Claude) API Key</label>
+                          <input type="password" id="setting-api-anthropic" name="anthropic_api_key" placeholder="sk-ant-..." autocomplete="new-password" data-lpignore="true" data-1p-ignore="true" data-form-type="other">
+                        </div>
+                        <div class="input-group">
+                          <label for="setting-api-groq">Groq Cloud API Key</label>
+                          <input type="password" id="setting-api-groq" name="groq_api_key" placeholder="gsk_..." autocomplete="new-password" data-lpignore="true" data-1p-ignore="true" data-form-type="other">
+                        </div>
+                      </div>
+
+                      <div class="settings-card">
+                        <h3>Yedeklilik Öncelik Sıralaması (Priority Order)</h3>
+                        <p class="whitelist-info">Sistem ilk önce 1. sıradaki sağlayıcıyı, cevap alamazsa 2., sonra 3. ve 4. sıradakini çağırır.</p>
+                        <div class="priority-list-container" id="api-priority-list">
+                          <!-- Rendered dynamically by settings.js -->
+                        </div>
+                      </div>
+                    </div>
+                    <div class="settings-actions">
+                      <button type="button" class="btn btn-save" id="btn-save-apikeys">Save API Keys & Priority</button>
+                    </div>
+                  </form>
+                </div>
+
+                <!-- Pane C: Model Routing -->
+                <div class="models-pane" id="models-pane-modelrouting">
+                  <form onsubmit="return false;" autocomplete="off">
+                    <div class="settings-card" style="margin-bottom: 16px;">
+                      <h3>Otomatik Model Switching</h3>
+                      <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:14px;">
+                        <label class="toggle-label" for="tool-model-switching-toggle" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                          <input type="checkbox" id="tool-model-switching-toggle" style="width:18px;height:18px;cursor:pointer;">
+                          <span style="font-weight:600;">Model Switching Aktif</span>
+                        </label>
+                        <span style="font-size:0.82rem;color:var(--text-muted);">— Açık olduğunda her tool çağrısı öncesinde LM Studio'da doğru model otomatik yüklenir.</span>
+                      </div>
+                      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                        <button type="button" class="btn" id="btn-test-lm-models" style="font-size:0.82rem;padding:5px 12px;">
+                          LM Studio Modellerini Sorgula
+                        </button>
+                        <div id="lm-live-models-list" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;"></div>
+                      </div>
+                      <p style="font-size:0.78rem;color:var(--text-muted);margin-top:8px;">
+                        Not: LM Studio 0.3.x+ gerektirir. Eski sürümlerde eject/load API çalışmaz — sadece uyarı verilir.
+                      </p>
+                    </div>
+
+                    <!-- Model Fallback Ladder -->
+                    <div class="settings-card" style="margin-bottom: 16px;">
+                      <h3>Model Yedeklilik Merdiveni (Fallback Ladder)</h3>
+                      <p class="whitelist-info" style="margin-bottom: 10px;">
+                        Tıpkı API merdiveninde olduğu gibi; bir model çağrısı başarısız olduğunda (çökme, timeout, bellek yetersizliği veya tool hatası) sistem sırasıyla bir üst basamaktaki modele tırmanarak işlemi orada yeniden dener. Sıralamayı ▲ / ▼ butonlarıyla belirleyebilirsiniz.
+                      </p>
+                      <div class="priority-list-container" id="model-ladder-list">
+                        <!-- Rendered by settings.js: renderModelLadder() -->
+                      </div>
+                      <div class="add-banned-row" style="margin-top: 12px; gap: 8px;">
+                        <select id="select-add-ladder-model" style="flex: 1; padding: 6px 10px; background: var(--bg-input, #2a2a3e); color: var(--text-primary, #fff); border: 1px solid var(--border-color, #3a3a5a); border-radius: 4px; font-size: 0.82rem;">
+                          <!-- Populated dynamically with available models -->
+                        </select>
+                        <button type="button" class="btn btn-add-banned" id="btn-add-ladder-model">+ Merdivene Ekle</button>
+                      </div>
+                    </div>
+
+                    <!-- Model Auto-Modes Profiles -->
+                    <div class="settings-card" style="margin-bottom: 16px;">
+                      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+                        <h3 style="margin:0;">Model Bazlı Otomatik Mod Eşleme (Auto-Modes)</h3>
+                        <button type="button" class="btn" id="btn-toggle-mode-guide" style="font-size:0.8rem; padding:4px 10px; background:var(--bg-input, #2a2a3e); border:1px solid var(--border-color, #3a3a5a); cursor:pointer;">
+                          Mod Açıklamaları & Rehber
+                        </button>
+                      </div>
+                      <p class="whitelist-info" style="margin-bottom: 12px;">
+                        Belirli bir model yüklendiğinde otomatik olarak hangi modların açılacağını belirleyin. Örneğin <strong>3B</strong> modellerde <strong>LPM</strong> modları otomatik açılabilir, büyük modellerde <strong>HPM</strong> veya <strong>Derin Düşünme</strong> devreye girebilir.
+                      </p>
+
+                      <!-- Collapsible Guide Box -->
+                      <div id="mode-guide-box" style="display:none; margin-bottom:16px; padding:14px; background:var(--bg-secondary, #1a1b26); border:1px solid var(--border-color, #3a3a5a); border-radius:6px; font-size:0.82rem; line-height:1.55;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid var(--border-color, #333); padding-bottom:6px;">
+                          <strong style="color:var(--accent-color, #7c6fcf); font-size:0.9rem;">Çalışma Modları Kılavuzu & Açıklamalar</strong>
+                          <button type="button" id="btn-close-mode-guide" style="background:none; border:none; color:var(--text-muted, #888); font-size:1rem; cursor:pointer;">✕</button>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:10px; margin-bottom:12px;">
+                          <div style="background:var(--bg-input, #222336); padding:10px; border-radius:4px; border-left:3px solid #60a5fa;">
+                            <strong style="color:#60a5fa;">LPM (Low Parameter Mode)</strong>
+                            <p style="margin:4px 0 0 0; color:var(--text-secondary, #ccc);">
+                              Küçük modeller (1B-7B) tüm araçları aynı anda gördüğünde bozuk JSON üretebilir. LPM, araçları küçük gruplar halinde tek tek sorarak ("bu araç gerekli mi?") sadece gereken araçları prompta ekler. Küçük modellerde <strong>kesinlikle AÇIK</strong> olmalıdır.
+                            </p>
+                          </div>
+
+                          <div style="background:var(--bg-input, #222336); padding:10px; border-radius:4px; border-left:3px solid #34d399;">
+                            <strong style="color:#34d399;">LPM OM (Low Parameter Mod Odak Modu)</strong>
+                            <p style="margin:4px 0 0 0; color:var(--text-secondary, #ccc);">
+                              LPM araç elemesine başlamadan önce modele <em>"Kafanda nasıl bir araç kullanmak var?"</em> diye sorar ve ihtiyacı netleştirir. 3B modellerin hedeften sapmaması için <strong>LPM ile birlikte AÇIK</strong> tutulması önerilir.
+                            </p>
+                          </div>
+
+                          <div style="background:var(--bg-input, #222336); padding:10px; border-radius:4px; border-left:3px solid #f59e0b;">
+                            <strong style="color:#f59e0b;">HPM (High Parameter Mode)</strong>
+                            <p style="margin:4px 0 0 0; color:var(--text-secondary, #ccc);">
+                              LPM'nin tam tersidir. 14b ve fazlası parametreli modellerde gereksiz api çağırmayı ve yavaşlamasını önler. Bu gibi büyük parametreli modeller işini LPM olmadan daha iyi yapıcağı kesindir.
+                            </p>
+                          </div>
+
+                          <div style="background:var(--bg-input, #222336); padding:10px; border-radius:4px; border-left:3px solid #a78bfa;">
+                            <strong style="color:#a78bfa;">Derin Düşünme (Advanced Reasoning)</strong>
+                            <p style="margin:4px 0 0 0; color:var(--text-secondary, #ccc);">
+                              Ajanı iki aşamalı çalıştırır: Önce bir Mimar (Planner) gibi düşünüp işi planlar, araç çalıştıktan sonra Kalite Kontrolcü (QA Checker) gibi sonucu denetler. Karmaşık kodlama ve hata ayıklamada <strong>AÇIK</strong> önerilir.
+                            </p>
+                          </div>
+
+                          <div style="background:var(--bg-input, #222336); padding:10px; border-radius:4px; border-left:3px solid #ec4899;">
+                            <strong style="color:#ec4899;">Görev Planı (Force Task Plan)</strong>
+                            <p style="margin:4px 0 0 0; color:var(--text-secondary, #ccc);">
+                              Ajanın körlemesine işlem yapmasını engeller; zorunlu olarak önce task_plan aracını çağırıp ekranda yapılacaklar listesi (Checklist) oluşturmasını sağlar. Adım adım takip için <strong>AÇIK</strong> tutulabilir.
+                            </p>
+                          </div>
+
+                          <div style="background:var(--bg-input, #222336); padding:10px; border-radius:4px; border-left:3px solid #38bdf8;">
+                            <strong style="color:#38bdf8;">SiMBA (Hafıza & Geçmiş Tecrübe)</strong>
+                            <p style="margin:4px 0 0 0; color:var(--text-secondary, #ccc);">
+                              Ajanın uzun vadeli hafızasını (memory.json) tarar; benzer geçmiş görevleri, yapılan düzeltmeleri ve tecrübeleri modele enjekte eder. Geçmişi hatırlaması için <strong>AÇIK</strong> tutulmalıdır.
+                            </p>
+                          </div>
+                        </div>
+
+                        <!-- Quick Model Recommendation Table -->
+                        <div style="overflow-x:auto;">
+                          <table style="width:100%; border-collapse:collapse; font-size:0.78rem; text-align:center;">
+                            <thead>
+                              <tr style="background:var(--bg-input, #222336); color:var(--text-primary, #fff);">
+                                <th style="padding:6px; text-align:left; border:1px solid #333;">Model Boyutu</th>
+                                <th style="padding:6px; border:1px solid #333;">LPM</th>
+                                <th style="padding:6px; border:1px solid #333;">LPM OM</th>
+                                <th style="padding:6px; border:1px solid #333;">HPM</th>
+                                <th style="padding:6px; border:1px solid #333;">Derin Düşünme</th>
+                                <th style="padding:6px; border:1px solid #333;">Görev Planı</th>
+                                <th style="padding:6px; border:1px solid #333;">SiMBA</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr>
+                                <td style="padding:6px; text-align:left; border:1px solid #333; font-weight:600;">3B Model (örn: qwen2.5-3b)</td>
+                                <td style="padding:6px; border:1px solid #333; color:#34d399; font-weight:600;">AÇIK</td>
+                                <td style="padding:6px; border:1px solid #333; color:#34d399; font-weight:600;">AÇIK</td>
+                                <td style="padding:6px; border:1px solid #333; color:#f87171;">KAPALI</td>
+                                <td style="padding:6px; border:1px solid #333; color:#f87171;">KAPALI</td>
+                                <td style="padding:6px; border:1px solid #333; color:#aaa;">İsteğe Bağlı</td>
+                                <td style="padding:6px; border:1px solid #333; color:#f87171;">KAPALI</td>
+                              </tr>
+                              <tr>
+                                <td style="padding:6px; text-align:left; border:1px solid #333; font-weight:600;">7B Model (örn: qwen2.5-coder-7b)</td>
+                                <td style="padding:6px; border:1px solid #333; color:#34d399; font-weight:600;">AÇIK</td>
+                                <td style="padding:6px; border:1px solid #333; color:#aaa;">İsteğe Bağlı</td>
+                                <td style="padding:6px; border:1px solid #333; color:#f87171;">KAPALI</td>
+                                <td style="padding:6px; border:1px solid #333; color:#34d399; font-weight:600;">AÇIK</td>
+                                <td style="padding:6px; border:1px solid #333; color:#34d399; font-weight:600;">AÇIK</td>
+                                <td style="padding:6px; border:1px solid #333; color:#34d399; font-weight:600;">AÇIK</td>
+                              </tr>
+                              <tr>
+                                <td style="padding:6px; text-align:left; border:1px solid #333; font-weight:600;">14B Model (örn: qwen2.5-coder-14b)</td>
+                                <td style="padding:6px; border:1px solid #333; color:#f87171;">KAPALI</td>
+                                <td style="padding:6px; border:1px solid #333; color:#f87171;">KAPALI</td>
+                                <td style="padding:6px; border:1px solid #333; color:#34d399; font-weight:600;">AÇIK</td>
+                                <td style="padding:6px; border:1px solid #333; color:#34d399; font-weight:600;">AÇIK</td>
+                                <td style="padding:6px; border:1px solid #333; color:#34d399; font-weight:600;">AÇIK</td>
+                                <td style="padding:6px; border:1px solid #333; color:#34d399; font-weight:600;">AÇIK</td>
+                              </tr>
+                              <tr>
+                                <td style="padding:6px; text-align:left; border:1px solid #333; font-weight:600;">26B / 32B+ (örn: gemma-4-26b)</td>
+                                <td style="padding:6px; border:1px solid #333; color:#f87171;">KAPALI</td>
+                                <td style="padding:6px; border:1px solid #333; color:#f87171;">KAPALI</td>
+                                <td style="padding:6px; border:1px solid #333; color:#34d399; font-weight:600;">AÇIK</td>
+                                <td style="padding:6px; border:1px solid #333; color:#34d399; font-weight:600;">AÇIK</td>
+                                <td style="padding:6px; border:1px solid #333; color:#34d399; font-weight:600;">AÇIK</td>
+                                <td style="padding:6px; border:1px solid #333; color:#34d399; font-weight:600;">AÇIK</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      <div id="model-mode-profiles-list">
+                        <!-- Rendered by settings.js: renderModelModeProfiles() -->
+                      </div>
+                    </div>
+
+                    <div class="settings-card">
+                      <h3>Tool Bazlı Model Profili</h3>
+                      <p class="whitelist-info" style="margin-bottom:14px;">Her tool için <strong>Ana Model</strong> tag'ini seçin. Tool başarısız olursa <strong>Fallback</strong> tag'li modele geçilir.</p>
+                      <div class="tool-model-routing-header">
+                        <span class="tool-route-col-tool">Tool</span>
+                        <span class="tool-route-col-main">Ana Profil</span>
+                        <span class="tool-route-col-arrow"></span>
+                        <span class="tool-route-col-fb">Fallback Profil</span>
+                      </div>
+                      <div id="tool-model-routing-list">
+                        <!-- Rendered by settings.js: initToolModelRouting() -->
+                      </div>
+                    <!-- AMPR Performance Table Card (Simple UI) -->
+                    <div class="settings-card" style="margin-top: 16px;">
+                      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
+                        <div>
+                          <h3 style="margin:0;">Adaptif Model Performans Defteri (AMPR)</h3>
+                          <p class="whitelist-info" style="margin:4px 0 0 0;">Araç bazında ölçülen başarı oranı, parser katmanı, yanıt gecikmesi ve EWMA skorları.</p>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                          <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:0.85rem;">
+                            <input type="checkbox" id="ampr-adaptive-toggle" checked style="width:16px; height:16px; cursor:pointer;">
+                            <span>Adaptif Yönlendirme Açık</span>
+                          </label>
+                          <button type="button" class="btn" id="btn-refresh-ampr" style="font-size:0.8rem; padding:4px 10px;">Yenile</button>
+                          <button type="button" class="btn" id="btn-reset-ampr" style="font-size:0.8rem; padding:4px 10px; background:#ef4444; color:#fff;">Sıfırla</button>
+                        </div>
+                      </div>
+
+                      <div style="overflow-x:auto;">
+                        <table style="width:100%; border-collapse:collapse; font-size:0.82rem;" id="ampr-performance-table">
+                          <thead>
+                            <tr style="background:var(--bg-input, #222336); text-align:left; border-bottom:1px solid #3a3a5a;">
+                              <th style="padding:8px 6px;">Model</th>
+                              <th style="padding:8px 6px;">Araç (Tool)</th>
+                              <th style="padding:8px 6px; text-align:center;">Örnek</th>
+                              <th style="padding:8px 6px; text-align:center;">Başarı %</th>
+                              <th style="padding:8px 6px; text-align:center;">Ort. Katman</th>
+                              <th style="padding:8px 6px; text-align:center;">Ort. Gecikme</th>
+                              <th style="padding:8px 6px; text-align:right;">EWMA Skor</th>
+                            </tr>
+                          </thead>
+                          <tbody id="ampr-performance-tbody">
+                            <tr>
+                              <td colspan="7" style="padding:12px; text-align:center; color:var(--text-muted);">Henüz performans kaydı birikmedi (En az 3 çağrı gereklidir).</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div class="settings-actions">
+                      <button type="button" class="btn btn-save" id="btn-save-tool-model-routing">Model ve Yönlendirme Ayarlarını Kaydet</button>
+                    </div>
+                  </form>
+                </div>
+              </section>
+
+              <!-- 4. System Prompts -->
+              <section class="settings-subpanel" id="settings-subpanel-prompts">
+                <div class="subpanel-header">
+                  <h2>System Prompts Manager</h2>
+                  <p class="whitelist-info">Kodlar arasında bulunan tüm sistem promptlarını buradan görüntüleyebilir ve değiştirebilirsiniz.</p>
+                </div>
+
+                <!-- Multi-Agent Algorithm & Prompt Lifecycle Diagram Card -->
+                <div class="settings-card algorithm-diagram-card">
+                  <div class="algorithm-card-header">
+                    <div>
+                      <h3>Sistem Mimarisi ve Prompt Akış Şeması</h3>
+                      <p class="whitelist-info" style="margin: 0;">Sistemin çalışma adımlarını ve promptların nerede, ne zaman tetiklendiğini gösteren mimari harita.</p>
+                    </div>
+                    <button type="button" class="btn btn-inspect-diagram" id="btn-zoom-diagram" title="Görseli Tam Ekran Aç">Büyüt / İncele</button>
+                  </div>
+                  <div class="algorithm-img-wrapper" id="algorithm-img-trigger">
+                    <img src="assets/system_prompts_algorithm.svg" alt="Stellarigent Algorithm Workflow" class="algorithm-workflow-img" id="diagram-thumb-img">
+                    <div class="algorithm-img-overlay">
+                      <span>Tam Ekran İncelemek İçin Tıklayın</span>
+                    </div>
+                  </div>
+                  
+                  <!-- Interactive Quick-Jump Prompt Pills -->
+                  <div class="prompt-flow-pills-container">
+                    <span class="prompt-flow-label">Promptlara Hızlı Git & Düzenle:</span>
+                    <div class="prompt-flow-pills">
+                      <button type="button" class="flow-pill-btn" data-target-prompt="main_prompt">Ana Ajan (main_prompt)</button>
+                      <button type="button" class="flow-pill-btn" data-target-prompt="ide_planner">Mimar (ide_planner)</button>
+                      <button type="button" class="flow-pill-btn" data-target-prompt="task_plan_converter">Plan (task_plan_converter)</button>
+                      <button type="button" class="flow-pill-btn" data-target-prompt="om_ideal_tool">LPM OM (om_ideal_tool)</button>
+                      <button type="button" class="flow-pill-btn" data-target-prompt="swarm_planner">Swarm Planner</button>
+                      <button type="button" class="flow-pill-btn" data-target-prompt="swarm_developer">Swarm Developer</button>
+                      <button type="button" class="flow-pill-btn" data-target-prompt="swarm_qa_tester">Swarm QA Tester</button>
+                      <button type="button" class="flow-pill-btn" data-target-prompt="ide_checker">QA Checker (ide_checker)</button>
+                      <button type="button" class="flow-pill-btn" data-target-prompt="qa_analysis">QA Red Analizi (qa_analysis)</button>
+                      <button type="button" class="flow-pill-btn" data-target-prompt="sgm_health_check">SGM Sağlık (sgm_health_check)</button>
+                      <button type="button" class="flow-pill-btn" data-target-prompt="web_research_safety">Web Güvenlik (web_research_safety)</button>
+                      <button type="button" class="flow-pill-btn" data-target-prompt="finance_mode">Finans (finance_mode)</button>
+                      <button type="button" class="flow-pill-btn" data-target-prompt="chart_data_extractor">Grafik OCR (chart_data_extractor)</button>
+                      <button type="button" class="flow-pill-btn" data-target-prompt="simba_memory_search">SiMBA Hafıza (simba_memory_search)</button>
+                      <button type="button" class="flow-pill-btn" data-target-prompt="library_doc_selector">Kütüphane Doküman (library_doc_selector)</button>
+                      <button type="button" class="flow-pill-btn" data-target-prompt="entity_router">Varlık Router (entity_router)</button>
                     </div>
                   </div>
                 </div>
-                <div class="input-group" style="margin-top: 15px;">
-                  <label for="discord-speed-limit">Connection Speed Limit (MB/s)</label>
-                  <input type="number" id="discord-speed-limit" min="0.1" max="100" step="0.1" value="0.7">
-                </div>
-                <div class="settings-actions" style="margin-top: 20px;">
-                  <button class="btn btn-save" id="btn-save-discord-config" style="width: 100%;">Save Bot Configuration</button>
-                </div>
-              </div>
 
-              <!-- Admins Management -->
-              <div class="settings-card">
-                <h3>Bot Admins</h3>
-                <p class="whitelist-info">Users with full access to library management and high-privilege commands.</p>
-                <div class="banned-badges" id="discord-admins-list" style="margin-bottom: 15px;">
-                  <!-- Admins will be dynamically populated -->
+                <!-- System Prompt Editor Card -->
+                <div class="settings-card" id="system-prompt-editor-card">
+                  <div class="input-group">
+                    <label for="system-prompt-select">Düzenlenecek Sistem Promptunu Seçin</label>
+                    <select id="system-prompt-select" class="theme-select">
+                      <optgroup label="1. Ana Ajan & Çekirdek">
+                        <option value="main_prompt">Ana Ajan Sistem Promptu (config/system_prompt.txt)</option>
+                      </optgroup>
+                      <optgroup label="2. Planlama & Mimari">
+                        <option value="ide_planner">IDE Mimar Planlayıcı (ide_planner)</option>
+                        <option value="task_plan_converter">Görev Planı Dönüştürücü (task_plan_converter)</option>
+                        <option value="om_ideal_tool">LPM Odaklanma Modu Araç Tasarımcısı (om_ideal_tool)</option>
+                      </optgroup>
+                      <optgroup label="3. Swarm Çoklu-Ajan Ekibi">
+                        <option value="swarm_planner">Swarm Planner Agent (Takım Planlama Rolü)</option>
+                        <option value="swarm_developer">Swarm Developer Agent (Kod Geliştirici Rolü)</option>
+                        <option value="swarm_qa_tester">Swarm QA Tester Agent (Hata Giderici Rolü)</option>
+                      </optgroup>
+                      <optgroup label="4. Kalite Güvencesi (QA) & Denetim">
+                        <option value="ide_checker">IDE QA Kontrol Kapısı (ide_checker)</option>
+                        <option value="qa_analysis">QA Red Analizi & Feedback (qa_analysis)</option>
+                        <option value="sgm_health_check">SGM Görev Sağlık Denetçisi (sgm_health_check)</option>
+                      </optgroup>
+                      <optgroup label="5. Güvenlik, Arama & Uzman Modüller">
+                        <option value="web_research_safety">Web Araştırma Güvenlik Uyarısı (web_research_safety)</option>
+                        <option value="finance_mode">Finans Analiz Modu (finance_mode)</option>
+                        <option value="chart_data_extractor">Grafik OCR Sayı Çıkarıcı (chart_data_extractor)</option>
+                        <option value="simba_memory_search">SiMBA Hafıza Filtreleme (simba_memory_search)</option>
+                        <option value="library_doc_selector">MemoryLibrary Doküman Seçici (library_doc_selector)</option>
+                        <option value="entity_router">Görev & Varlık Yönlendirici (entity_router)</option>
+                      </optgroup>
+                    </select>
+                  </div>
+                  <div class="system-prompt-desc-box" id="system-prompt-desc">
+                    <!-- Dynamic explanation -->
+                  </div>
+                  <div class="input-group" style="margin-top: 12px;">
+                    <label for="system-prompt-textarea">Prompt İçeriği</label>
+                    <textarea id="system-prompt-textarea" class="guide-textarea monospace-textarea" rows="14" placeholder="Prompt metni buraya gelecek..."></textarea>
+                  </div>
+                  <div class="settings-actions">
+                    <button type="button" class="btn btn-save" id="btn-save-prompts">Save All System Prompts</button>
+                  </div>
                 </div>
-                <div class="add-banned-row">
-                  <input type="text" id="new-discord-admin-input" placeholder="e.g. 123456789012345678">
-                  <button class="btn btn-add-banned" id="btn-add-discord-admin">Add Admin</button>
-                </div>
-              </div>
+              </section>
 
-              <!-- Authorized Music Users -->
-              <div class="settings-card">
-                <h3>Authorized Music Users</h3>
-                <p class="whitelist-info">Users who have permission to join and play music from the library.</p>
-                <div class="banned-badges" id="discord-users-list" style="margin-bottom: 15px;">
-                  <!-- Users will be dynamically populated -->
+              <!-- 5. Auto -->
+              <section class="settings-subpanel" id="settings-subpanel-auto">
+                <div class="subpanel-header">
+                  <h2>Auto-Approval & Execution Modes</h2>
+                  <p class="whitelist-info">Kullanıcı onayı beklemeden otomatik çalışan araç ve mod ayarları.</p>
                 </div>
-                <div class="add-banned-row">
-                  <input type="text" id="new-discord-user-input" placeholder="e.g. 123456789012345678 or <@123456789012345678>">
-                  <button class="btn btn-add-banned" id="btn-add-discord-user">Add User</button>
+                <div class="settings-grid">
+                  <div class="settings-card">
+                    <h3>Granular Auto-Approvals (Otomatik Onaylı Araçlar)</h3>
+                    <p class="whitelist-info">Aşağıdaki düşük riskli eylemler kullanıcı onay penceresi açılmadan doğrudan yürütülür.</p>
+                    <div class="checkbox-list">
+                      <label class="checkbox-container">
+                        <input type="checkbox" id="approve-read_file">
+                        <span class="checkbox-label">Read File (`read_file`)</span>
+                      </label>
+                      <label class="checkbox-container">
+                        <input type="checkbox" id="approve-write_file">
+                        <span class="checkbox-label">Write/Edit File (`write_file`)</span>
+                      </label>
+                      <label class="checkbox-container">
+                        <input type="checkbox" id="approve-list_directory">
+                        <span class="checkbox-label">List Directory (`list_directory`)</span>
+                      </label>
+                      <label class="checkbox-container">
+                        <input type="checkbox" id="approve-web_search">
+                        <span class="checkbox-label">Web Search (`web_search`)</span>
+                      </label>
+                      <label class="checkbox-container">
+                        <input type="checkbox" id="approve-view_website">
+                        <span class="checkbox-label">View Website (`view_website`)</span>
+                      </label>
+                      <label class="checkbox-container">
+                        <input type="checkbox" id="approve-open_application">
+                        <span class="checkbox-label">Open GUI App (`open_application`)</span>
+                      </label>
+                      <label class="checkbox-container">
+                        <input type="checkbox" id="approve-send_discord_message">
+                        <span class="checkbox-label">Send Discord Message (`send_discord_message`)</span>
+                      </label>
+                      <label class="checkbox-container">
+                        <input type="checkbox" id="approve-line_checker">
+                        <span class="checkbox-label">Line Checker (`line_checker`)</span>
+                      </label>
+                      <label class="checkbox-container">
+                        <input type="checkbox" id="approve-url_image_reader">
+                        <span class="checkbox-label">Image Reader (`url_image_reader`)</span>
+                      </label>
+                      <label class="checkbox-container">
+                        <input type="checkbox" id="approve-library_mode">
+                        <span class="checkbox-label">Library Mode Search (`library_mode`)</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="settings-card">
+                    <h3>Mod ve Otomatik Yürütme Parametreleri</h3>
+                    <div class="setting-item-toggle">
+                      <label class="switch-container">
+                        <input type="checkbox" id="setting-swarm">
+                        <span class="switch-slider"></span>
+                        <span class="switch-label">Enable Swarm Mode (Multi-Agent Team)</span>
+                      </label>
+                    </div>
+                    <div class="setting-item-toggle" style="margin-top: 15px;">
+                      <label class="switch-container">
+                        <input type="checkbox" id="setting-lpm">
+                        <span class="switch-slider"></span>
+                        <span class="switch-label">Enable LPM (Low Parameter Mode)</span>
+                      </label>
+                    </div>
+                    <div class="setting-item-toggle" id="lpm-om-container" style="display:none; margin-top: 10px; margin-left: 20px;">
+                      <label class="switch-container">
+                        <input type="checkbox" id="setting-lpm-om">
+                        <span class="switch-slider"></span>
+                        <span class="switch-label">Enable LPM OM (Odaklanma Modu)</span>
+                      </label>
+                    </div>
+                    <div class="input-group" id="lpm-batch-container" style="display:none; margin-top: 15px; margin-left: 20px;">
+                      <label for="setting-lpm-batch" style="margin-bottom: 5px;">LPM Batch Size (Tools per query)</label>
+                      <div style="display: flex; align-items: center;">
+                        <input type="range" id="setting-lpm-batch" min="1" max="18" value="1" oninput="document.getElementById('lpm-batch-val').innerText = this.value" style="flex: 1;">
+                        <span id="lpm-batch-val" style="font-weight: bold; margin-left: 10px; width: 25px; text-align: center;">1</span>
+                      </div>
+                    </div>
+
+                    <!-- HPM: High Parameter Mode -->
+                    <div class="setting-item-toggle" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.07);">
+                      <label class="switch-container" title="30B+ parametreli modeller için LPM/OM batch çağrılarını devre dışı bırakır. Tek konsolide LLM çağrısı yapar.">
+                        <input type="checkbox" id="setting-hpm">
+                        <span class="switch-slider"></span>
+                        <span class="switch-label" style="color: var(--color-warning);">⚡ Enable HPM (High Parameter Mode — 30B+ modeller)</span>
+                      </label>
+                      <p style="font-size: 0.78em; color: var(--text-muted); margin-top: 6px; margin-left: 2px; line-height: 1.4;">
+                        LPM ve OM batch çağrılarını bypass eder. Büyük modeller araç seçimi + planlamayı tek LLM çağrısında yapabilir.
+                        <br>⚠️ HPM aktifken LPM devre dışı kalır.
+                      </p>
+                    </div>
+
+                    <!-- Daily Cloud Spend Cap -->
+                    <div class="setting-item-toggle" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.07);">
+                      <label for="setting-max-daily-cost" style="font-size: 0.88rem; font-weight: 600; color: #fff; margin-bottom: 6px; display: block;">
+                        💰 Günlük Bulut API Bütçe Limiti ($ USD)
+                      </label>
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="color: var(--color-success, #10b981); font-weight: bold;">$</span>
+                        <input type="number" id="setting-max-daily-cost" step="0.10" min="0.10" max="100.00" value="1.00" style="width: 100px; padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.3); color: #fff;">
+                        <span style="font-size: 0.78rem; color: var(--text-muted);">Aşıldığında sessiz bulut çağrıları durdurulur ve manuel onay moduna dönülür.</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+                <div class="settings-actions">
+                  <button type="button" class="btn btn-save" id="btn-save-auto">Save Auto Settings</button>
+                </div>
+              </section>
+
+              <!-- 6. Discord -->
+              <section class="settings-subpanel" id="settings-subpanel-discord">
+                <form onsubmit="return false;" autocomplete="off">
+                  <div class="subpanel-header">
+                    <h2>Discord Bot Management & Integration</h2>
+                    <p class="whitelist-info">Discord bot bağlantı parametreleri, kimlikler ve yetkili kullanıcılar.</p>
+                  </div>
+                  <div class="settings-grid">
+                    <div class="settings-card">
+                      <h3>Bot Configuration & Status</h3>
+                      <div class="input-group">
+                        <label>Bot Durumu</label>
+                        <div class="bot-status-container" style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
+                          <span class="status-dot offline" id="discord-bot-status-dot" style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 8px #ef4444;"></span>
+                          <span id="discord-bot-status-text" style="font-weight: 500; color: #ef4444;">Offline</span>
+                        </div>
+                      </div>
+                      <div class="input-group" style="margin-top: 10px;">
+                        <label for="discord-speed-limit">Connection Speed Limit (MB/s)</label>
+                        <input type="number" id="discord-speed-limit" min="0.1" max="100" step="0.1" value="0.7" autocomplete="off">
+                      </div>
+                      <div class="input-group">
+                        <label for="setting-env-token">Discord Bot Token (DISCORD_TOKEN)</label>
+                        <input type="password" id="setting-env-token" name="discord_token_cfg" placeholder="Discord Bot Token" autocomplete="new-password" data-lpignore="true" data-1p-ignore="true" data-form-type="other">
+                      </div>
+                      <div class="input-group">
+                        <label for="setting-env-founderid">Kurucu Discord ID (FOUNDER_DISCORD_ID)</label>
+                        <input type="text" id="setting-env-founderid" name="founder_id_cfg" placeholder="Örn: 123456789012345678" autocomplete="off">
+                      </div>
+                      <div class="input-group">
+                        <label for="setting-env-founderkey">Yönetici Giriş Şifresi (FOUNDER_KEY)</label>
+                        <input type="password" id="setting-env-founderkey" name="founder_key_cfg" placeholder="Giriş şifreniz" autocomplete="new-password" data-lpignore="true" data-1p-ignore="true" data-form-type="other">
+                      </div>
+                    </div>
+
+                    <div class="settings-card">
+                      <h3>Bot Admins & Authorized Users</h3>
+                      <h4>Bot Admins</h4>
+                      <p class="whitelist-info">Kütüphane yönetimi ve komut yetkisine sahip yöneticiler.</p>
+                      <div class="banned-badges" id="discord-admins-list" style="margin-bottom: 12px;"></div>
+                      <div class="add-banned-row" style="margin-bottom: 16px;">
+                        <input type="text" id="new-discord-admin-input" placeholder="e.g. 123456789012345678" autocomplete="off">
+                        <button type="button" class="btn btn-add-banned" id="btn-add-discord-admin">Add Admin</button>
+                      </div>
+
+                      <h4>Authorized Users</h4>
+                      <p class="whitelist-info">Kütüphaneye erişme izni olan kullanıcılar.</p>
+                      <div class="banned-badges" id="discord-users-list" style="margin-bottom: 12px;"></div>
+                      <div class="add-banned-row">
+                        <input type="text" id="new-discord-user-input" placeholder="e.g. 987654321098765432" autocomplete="off">
+                        <button type="button" class="btn btn-add-banned" id="btn-add-discord-user">Add User</button>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="settings-actions">
+                    <button type="button" class="btn btn-save" id="btn-save-discord-all">Save Discord Settings</button>
+                  </div>
+                </form>
+              </section>
+
+              <!-- 6. Perm (Security, Tripwire & Banned Shell Commands) -->
+              <section class="settings-subpanel" id="settings-subpanel-perm">
+                <!-- Tripwire Safety Card -->
+                <div class="settings-card" style="margin-bottom: 1rem; border-left: 3px solid var(--color-danger, #ef4444);">
+                  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                    <div>
+                      <h3 style="margin: 0; font-size: 0.95rem; color: #fff;">🚨 Acil Durum Freni (Safety Tripwire)</h3>
+                      <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-muted);">
+                        Ajan 'agent_user.json' dosyasını okuduğunda güvenlik nedeniyle kilitlenir. Kilitlendiğinde sunucuyu yeniden başlatmadan buradan sıfırlayabilirsiniz.
+                      </p>
+                    </div>
+                    <button type="button" class="btn btn-secondary" id="btn-reset-tripwire" style="background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.5); color: #f87171; font-size: 0.82rem; padding: 6px 14px; white-space: nowrap; cursor: pointer;">
+                      🔓 Kilidi Aç / Sıfırla
+                    </button>
+                  </div>
+                </div>
+
+                <div class="settings-card banned-card" style="margin: 0;">
+                  <h3>Banned Shell Commands Blacklist</h3>
+                  <p>Commands containing these exact phrases or expressions will be blocked automatically by the backend before reaching the approval dialog.</p>
+                  <div class="banned-badges" id="banned-badges">
+                    <!-- Badges dynamically rendered here -->
+                  </div>
+                  <div class="add-banned-row">
+                    <input type="text" id="new-banned-input" placeholder="e.g. rm -rf">
+                    <button type="button" class="btn btn-add-banned" id="btn-add-banned">Add Blacklist Item</button>
+                  </div>
+                </div>
+              </section>
+            </main>
           </div>
         </div>
 
@@ -650,24 +1129,26 @@
               </div>
               <!-- Card 1: Environment Variables (.env) -->
               <div class="settings-card">
-                <h3>Çevre Değişkenleri (.env)</h3>
-                <div class="input-group">
-                  <label for="admin-env-port">Web Sunucu Portu (PORT)</label>
-                  <input type="text" id="admin-env-port" placeholder="3000">
-                </div>
-                <div class="input-group">
-                  <label for="admin-env-founderkey">Yönetici Giriş Şifresi (FOUNDER_KEY)</label>
-                  <input type="password" id="admin-env-founderkey" placeholder="Giriş şifrenizi girin">
-                </div>
-                <div class="input-group">
-                  <label for="admin-env-token">Discord Bot Token (DISCORD_TOKEN)</label>
-                  <input type="password" id="admin-env-token" placeholder="Discord Token">
-                </div>
-                <div class="input-group">
-                  <label for="admin-env-founderid">Kurucu Discord ID (FOUNDER_DISCORD_ID)</label>
-                  <input type="text" id="admin-env-founderid" placeholder="Discord User ID">
-                </div>
-                <button class="btn btn-save" id="btn-save-env" style="width: 100%; margin-top: 10px;">Çevre Değişkenlerini Kaydet</button>
+                <form onsubmit="return false;" autocomplete="off">
+                  <h3>Çevre Değişkenleri (.env)</h3>
+                  <div class="input-group">
+                    <label for="admin-env-port">Web Sunucu Portu (PORT)</label>
+                    <input type="text" id="admin-env-port" name="admin_port" placeholder="3000" autocomplete="off">
+                  </div>
+                  <div class="input-group">
+                    <label for="admin-env-founderkey">Yönetici Giriş Şifresi (FOUNDER_KEY)</label>
+                    <input type="password" id="admin-env-founderkey" name="admin_founder_key" placeholder="Giriş şifrenizi girin" autocomplete="new-password" data-lpignore="true" data-1p-ignore="true" data-form-type="other">
+                  </div>
+                  <div class="input-group">
+                    <label for="admin-env-token">Discord Bot Token (DISCORD_TOKEN)</label>
+                    <input type="password" id="admin-env-token" name="admin_token" placeholder="Discord Token" autocomplete="new-password" data-lpignore="true" data-1p-ignore="true" data-form-type="other">
+                  </div>
+                  <div class="input-group">
+                    <label for="admin-env-founderid">Kurucu Discord ID (FOUNDER_DISCORD_ID)</label>
+                    <input type="text" id="admin-env-founderid" name="admin_founder_id" placeholder="Discord User ID" autocomplete="off">
+                  </div>
+                  <button type="button" class="btn btn-save" id="btn-save-env" style="width: 100%; margin-top: 10px;">Çevre Değişkenlerini Kaydet</button>
+                </form>
               </div>
 
               <!-- Card 2: Security Rules (security_rules.json) -->
@@ -719,6 +1200,15 @@
                 </div>
                 <button class="btn btn-reject" id="btn-clear-all-memories" style="width: 100%;">Tüm Hafıza Geçmişini Temizle (Wipe)</button>
               </div>
+
+              <!-- Card 5: Pending Security Rules -->
+              <div class="settings-card" id="card-pending-rules" style="margin-top: 15px;">
+                <h3>Onay Bekleyen Güvenlik Kuralları</h3>
+                <p class="whitelist-info" style="margin-bottom: 10px;">Kullanıcı iptallerinden damıtılan kural önerileri. Onaylanana kadar aktif prompta eklenmez.</p>
+                <div class="admin-memory-list" id="admin-pending-rules-list" style="max-height: 200px; overflow-y: auto; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; font-size: 0.8rem; line-height: 1.4; font-family: monospace;">
+                  <span style="color: var(--text-muted);">Onay bekleyen güvenlik kuralı bulunmuyor.</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -753,6 +1243,73 @@
       </section>
     </main>
   </div>
+
+  <!-- Setup Wizard Modal -->
+  <div id="setup-modal" class="setup-overlay hidden">
+    <div class="setup-modal-card">
+      <div class="setup-modal-header">
+        <h2>🛠️ Sistem İlk Kurulumu (Setup)</h2>
+        <p>Stellarigent'a hoş geldiniz. Başlamak için lütfen temel erişim şifrenizi belirleyin.</p>
+      </div>
+      <form id="setup-form" class="setup-form">
+        <div class="setup-input-group">
+          <label for="setup-founder-key">Founder Password (Yönetici Şifresi) <span class="badge-required">* Zorunlu</span></label>
+          <input type="password" id="setup-founder-key" placeholder="Örn: Güçlü bir şifre girin..." required autocomplete="new-password">
+          <small>Arayüze ve WebSocket bağlantısına erişim için kullanılır.</small>
+        </div>
+        <div class="setup-input-group">
+          <label for="setup-discord-token">Discord Bot Token <span class="badge-optional">(Opsiyonel)</span></label>
+          <input type="password" id="setup-discord-token" name="setup_discord_token" placeholder="Discord bot tokeninizi yapıştırın..." autocomplete="new-password" data-lpignore="true" data-1p-ignore="true" data-form-type="other">
+          <small>Discord botu entegrasyonu için gereklidir. İstemiyorsanız boş bırakabilirsiniz.</small>
+        </div>
+        <div class="setup-input-group">
+          <label for="setup-founder-id">Discord Yetkili Kullanıcı ID'si <span class="badge-optional">(Opsiyonel)</span></label>
+          <input type="text" id="setup-founder-id" placeholder="Örn: 123456789012345678">
+          <small>Discord üzerinden bota komut gönderecek yetkili kullanıcının ID'si.</small>
+        </div>
+        <div id="setup-status-msg" class="setup-status-msg hidden"></div>
+        <div class="setup-actions">
+          <button type="submit" id="setup-submit-btn" class="btn btn-save" style="width: 100%;">Kurulumu Tamamla ve Başlat</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Simple Founder Auth Modal -->
+  <div id="auth-modal" class="setup-overlay hidden">
+    <div class="setup-modal-card" style="max-width: 420px;">
+      <div class="setup-modal-header">
+        <h2>🔐 Yönetici Girişi</h2>
+        <p>Arayüze erişmek için Founder Password girin.</p>
+      </div>
+      <form id="auth-form" class="setup-form">
+        <div class="setup-input-group">
+          <label for="auth-founder-key">Founder Password</label>
+          <input type="password" id="auth-founder-key" placeholder="Şifrenizi girin..." required autocomplete="current-password">
+        </div>
+        <div id="auth-status-msg" class="setup-status-msg hidden"></div>
+        <div class="setup-actions">
+          <button type="submit" id="auth-submit-btn" class="btn btn-save" style="width: 100%;">Giriş Yap</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Algorithm Diagram Fullscreen Lightbox Modal -->
+  <div id="diagram-modal" class="setup-overlay hidden">
+    <div class="diagram-modal-content">
+      <div class="diagram-modal-header">
+        <h3>Sistem Mimarisi &amp; Algoritma Akış Şeması</h3>
+        <button type="button" class="diagram-modal-close" id="btn-close-diagram-modal">&times;</button>
+      </div>
+      <div class="diagram-modal-body">
+        <img src="assets/system_prompts_algorithm.svg" alt="Stellarigent Algorithm Diagram Full">
+      </div>
+    </div>
+  </div>
+
+  <script src="setup.js"></script>
+  <script src="settings.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

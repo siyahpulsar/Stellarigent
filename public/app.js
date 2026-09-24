@@ -102,10 +102,61 @@ const statBlocks = document.getElementById('stat-blocks');
 let allowedActionsCount = 0;
 let blockedActionsCount = 0;
 
+// Authentication Modal Helpers
+function showAuthModal(errorMsg = '') {
+  const modal = document.getElementById('auth-modal');
+  const msgEl = document.getElementById('auth-status-msg');
+  const input = document.getElementById('auth-founder-key');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+  if (msgEl) {
+    if (errorMsg) {
+      msgEl.textContent = errorMsg;
+      msgEl.classList.remove('hidden');
+    } else {
+      msgEl.textContent = '';
+      msgEl.classList.add('hidden');
+    }
+  }
+  if (input) {
+    setTimeout(() => input.focus(), 100);
+  }
+}
+
+function hideAuthModal() {
+  const modal = document.getElementById('auth-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+// Bind auth form submit once
+if (!window._authFormBound) {
+  window._authFormBound = true;
+  document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('auth-form');
+    if (form) {
+      form.onsubmit = (e) => {
+        e.preventDefault();
+        const input = document.getElementById('auth-founder-key');
+        const val = input ? input.value.trim() : '';
+        if (!val) return;
+        localStorage.setItem('founderKey', val);
+        hideAuthModal();
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'auth', key: val }));
+        } else {
+          initWebSocket();
+        }
+      };
+    }
+  });
+}
+
 // Initialize Websocket Connection
 function initWebSocket() {
+  window.initWebSocket = initWebSocket;
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   ws = new WebSocket(`${protocol}//${window.location.host}`);
+  window.ws = ws;
 
   ws.onopen = () => {
     console.log('Connected to agent server.');
@@ -114,9 +165,8 @@ function initWebSocket() {
     // Auth flow
     let savedKey = localStorage.getItem('founderKey');
     if (!savedKey) {
-      showToast('⚠️ FOUNDER_KEY bulunamadı. Lütfen Admin panelinden giriş yapın.', 'warning');
-      const adminTabBtn = document.querySelector('[data-tab="admin"]');
-      if (adminTabBtn) adminTabBtn.click();
+      showAuthModal('Devam etmek için lütfen Founder Password (Yönetici Şifresi) girin.');
+      return;
     }
     
     ws.send(JSON.stringify({ type: 'auth', key: savedKey }));
@@ -135,6 +185,7 @@ function initWebSocket() {
       case 'auth_success':
         console.log('Authentication successful.');
         appendTerminal('\n*** SYSTEM: Authentication successful. ***\n');
+        hideAuthModal();
         break;
       case 'state':
         localAgentState = { ...data };
@@ -166,6 +217,16 @@ function initWebSocket() {
       case 'settings':
         updateSettingsUI(data.settings);
         break;
+      case 'model_modes_applied':
+        if (data.modes) {
+          if (typeof updateSettingsUI === 'function') {
+            updateSettingsUI(Object.assign({}, currentConfig, data.modes));
+          }
+          if (typeof showToast === 'function') {
+            showToast(`"${data.modelId}" için otomatik modlar uygulandı!`, 'info');
+          }
+        }
+        break;
       case 'terminal':
         appendTerminal(data.data);
         break;
@@ -190,6 +251,10 @@ function initWebSocket() {
         if (ramMbEl) ramMbEl.textContent = `${data.ramUsedMB} MB / ${data.ramTotalMB} MB`;
         break;
       case 'error':
+        if (data.message && data.message.toLowerCase().includes('admin key')) {
+          localStorage.removeItem('founderKey');
+          showAuthModal('❌ Hatalı Founder Password! Lütfen doğru şifreyi girin.');
+        }
         showToast(`Error: ${data.message}`, 'error');
         appendTerminal(`\n[BACKEND ERROR] ${data.message}\n`);
         break;
@@ -212,14 +277,94 @@ function initWebSocket() {
         }
         if (summaryEl) summaryEl.textContent = data.summarySnippet || 'Henüz özet yok.';
         break;
+      case 'task_step':
+        if (data.step) handleTaskStep(data.step);
+        break;
+      case 'task_steps_clear':
+        clearTaskLivePanel();
+        break;
+      case 'toast':
+        showToast(data.message, data.level || 'info');
+        break;
+      case 'checkpoint_available':
+        showCheckpointBanner(data.checkpoint);
+        break;
     }
   };
 
-  ws.onclose = () => {
-    console.log('Connection closed. Reconnecting...');
+  ws.onclose = (event) => {
+    console.log('Connection closed. Code:', event.code);
+    if (event.code === 1008) {
+      appendTerminal('\n*** SYSTEM: Kimlik doğrulama reddedildi (1008). Şifre girişi bekleniyor... ***\n');
+      showAuthModal('❌ Kimlik doğrulama başarısız. Lütfen geçerli Founder Password girin.');
+      return; // Do NOT continuously loop
+    }
     appendTerminal('\n*** SYSTEM: Connection lost. Reconnecting in 3s... ***\n');
     setTimeout(initWebSocket, 3000);
   };
+}
+
+// ----------------------------------------------------
+// Checkpoint Resume Banner
+// ----------------------------------------------------
+
+function showCheckpointBanner(cp) {
+  // Eski banner varsa kaldır
+  const existing = document.getElementById('checkpoint-banner');
+  if (existing) existing.remove();
+
+  const banner = document.createElement('div');
+  banner.id = 'checkpoint-banner';
+  banner.style.cssText = [
+    'position:fixed', 'top:0', 'left:0', 'right:0', 'z-index:99998',
+    'background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%)',
+    'border-bottom:2px solid #4a9eff', 'padding:14px 20px',
+    'display:flex', 'align-items:center', 'gap:16px',
+    'font-size:13px', 'color:#c8d6e5',
+    'box-shadow:0 4px 20px rgba(0,0,0,0.6)'
+  ].join(';');
+
+  const progressText = cp.progressLabel || `${cp.stepIndex} adım işlendi`;
+  const taskPreview = cp.task ? cp.task.substring(0, 100) + (cp.task.length > 100 ? '...' : '') : 'Bilinmeyen görev';
+
+  banner.innerHTML = `
+    <span style="font-size:20px">⏸️</span>
+    <div style="flex:1">
+      <div style="font-weight:600;color:#4a9eff;margin-bottom:3px">Yarıda Kalan Görev Bulundu</div>
+      <div style="color:#8899aa;font-size:12px">
+        <strong style="color:#c8d6e5">${taskPreview}</strong>
+        &nbsp;·&nbsp; ${progressText} &nbsp;·&nbsp; <span style="color:#6b7c93">${cp.ageLabel || ''}</span>
+      </div>
+    </div>
+    <button id="cp-resume-btn" style="
+      background:#4a9eff;color:#fff;border:none;padding:8px 18px;
+      border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;
+      transition:background 0.2s
+    ">▶ Devam Et</button>
+    <button id="cp-dismiss-btn" style="
+      background:transparent;color:#6b7c93;border:1px solid #2d3f55;
+      padding:8px 14px;border-radius:6px;cursor:pointer;font-size:12px;
+      transition:all 0.2s
+    ">✕ Yoksay</button>
+  `;
+
+  document.body.prepend(banner);
+
+  // Buton event'leri
+  banner.querySelector('#cp-resume-btn').addEventListener('click', () => {
+    banner.remove();
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'resume_checkpoint' }));
+      showToast('Görev devam ettiriliyor...', 'info');
+    }
+  });
+
+  banner.querySelector('#cp-dismiss-btn').addEventListener('click', () => {
+    banner.remove();
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'delete_checkpoint' }));
+    }
+  });
 }
 
 // ----------------------------------------------------
@@ -232,10 +377,17 @@ function updateAdminUI(data) {
   adminDataState = data;
   
   if (data.env) {
-    document.getElementById('admin-env-port').value = data.env.PORT || '';
-    document.getElementById('admin-env-founderkey').value = data.env.FOUNDER_KEY || '';
-    document.getElementById('admin-env-token').value = data.env.DISCORD_TOKEN || '';
-    document.getElementById('admin-env-founderid').value = data.env.FOUNDER_DISCORD_ID || '';
+    if (document.getElementById('admin-env-port')) document.getElementById('admin-env-port').value = data.env.PORT || '';
+    if (document.getElementById('admin-env-founderkey')) document.getElementById('admin-env-founderkey').value = data.env.FOUNDER_KEY || '';
+    if (document.getElementById('admin-env-token')) document.getElementById('admin-env-token').value = data.env.DISCORD_TOKEN || '';
+    if (document.getElementById('admin-env-founderid')) document.getElementById('admin-env-founderid').value = data.env.FOUNDER_DISCORD_ID || '';
+
+    const sFounderKey = document.getElementById('setting-env-founderkey');
+    const sToken = document.getElementById('setting-env-token');
+    const sFounderId = document.getElementById('setting-env-founderid');
+    if (sFounderKey && !sFounderKey.value) sFounderKey.value = data.env.FOUNDER_KEY || '';
+    if (sToken && !sToken.value) sToken.value = data.env.DISCORD_TOKEN || '';
+    if (sFounderId && !sFounderId.value) sFounderId.value = data.env.FOUNDER_DISCORD_ID || '';
   }
   
   if (data.securityRules) {
@@ -273,16 +425,58 @@ function updateAdminUI(data) {
         const item = document.createElement('div');
         item.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
         item.style.padding = '8px 0';
+        const isRule = mem.isRule ? '<span style="color: var(--color-warning, #f59e0b); font-weight: bold;">[KURAL]</span> ' : '';
         item.innerHTML = `
-          <strong style="color: var(--color-primary);">[${idx + 1}] Görev:</strong> ${mem.task}<br>
+          <strong style="color: var(--color-primary);">[${idx + 1}] Görev:</strong> ${isRule}${mem.task}<br>
           <strong style="color: var(--color-success);">Özet:</strong> ${mem.summary}<br>
-          <span style="color: var(--text-muted); font-size: 0.75rem;">Tarih: ${new Date(mem.date).toLocaleString()}</span>
+          <span style="color: var(--text-muted); font-size: 0.75rem;">Tarih: ${new Date(mem.createdAt || mem.date).toLocaleString()} | Erişim: ${mem.accessCount || 0}</span>
         `;
         memoryListDiv.appendChild(item);
       });
     }
   }
+
+  const pendingRulesDiv = document.getElementById('admin-pending-rules-list');
+  if (pendingRulesDiv) {
+    pendingRulesDiv.innerHTML = '';
+    if (!data.pendingRules || data.pendingRules.length === 0) {
+      pendingRulesDiv.innerHTML = '<span style="color: var(--text-muted);">Onay bekleyen güvenlik kuralı bulunmuyor.</span>';
+    } else {
+      data.pendingRules.forEach((rule, idx) => {
+        const item = document.createElement('div');
+        item.style.borderBottom = '1px solid rgba(255,255,255,0.08)';
+        item.style.padding = '8px 0';
+        item.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+            <div style="flex: 1;">
+              <strong style="color: var(--color-warning, #f59e0b);">[Kural ${idx + 1}]</strong> ${rule.rule}<br>
+              <span style="color: var(--text-muted); font-size: 0.75rem;">Kategori: ${rule.category} | Tarih: ${new Date(rule.createdAt).toLocaleString()}</span>
+            </div>
+            <div style="display: flex; gap: 6px;">
+              <button class="btn btn-save" style="padding: 4px 10px; font-size: 0.75rem; cursor: pointer;" onclick="approveRule('${rule.id}')">Onayla</button>
+              <button class="btn btn-reject" style="padding: 4px 10px; font-size: 0.75rem; cursor: pointer;" onclick="rejectRule('${rule.id}')">Sil</button>
+            </div>
+          </div>
+        `;
+        pendingRulesDiv.appendChild(item);
+      });
+    }
+  }
 }
+
+window.approveRule = function(ruleId) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'approve_pending_rule', ruleId }));
+    if (typeof showToast === 'function') showToast('Güvenlik kuralı onaylandı ve hafızaya eklendi.', 'success');
+  }
+};
+
+window.rejectRule = function(ruleId) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'reject_pending_rule', ruleId }));
+    if (typeof showToast === 'function') showToast('Kural reddedildi ve silindi.', 'info');
+  }
+};
 
 function updateSandboxUI(data) {
   const sandboxCard = document.getElementById('sandbox-card');
@@ -395,7 +589,7 @@ function updateUIState(state) {
 
   // 2. Working Directory
   currentCwd = state.cwd;
-  cwdDisplay.textContent = state.cwd;
+  if (cwdDisplay) cwdDisplay.textContent = state.cwd;
 
   // 3. Render Thinking Row
   if (state.status === 'thinking' || state.status === 'executing') {
@@ -503,6 +697,13 @@ function updateUIState(state) {
     approvalDrawer.classList.remove('critical-risk');
     rejectionFeedback.value = ''; // Reset input
   }
+
+  // 6. Metrics & Real-Time Cost Update
+  if (state.metrics && state.metrics.cost) {
+    if (statTokens) statTokens.textContent = (state.metrics.cost.totalTokens || 0).toLocaleString();
+    const costEl = document.getElementById('stat-cost');
+    if (costEl) costEl.textContent = `$${(state.metrics.cost.totalCostUSD || 0).toFixed(4)}`;
+  }
 }
 
 // -----------------------------------------------------------------------
@@ -513,7 +714,7 @@ let _welcomeActive = true;
 
 const _WELCOME_HTML = `
   <div class="system-welcome">
-    <h2>Welcome to LM Studio Local AI Agent!</h2>
+    <h2>Welcome to Stellarigent!</h2>
     <p>Ensure your LM Studio Local Server is turned <strong>ON</strong> and a model is loaded. Type a task below to let the agent perform local operations.</p>
     <div class="examples-grid">
       <button class="example-btn">"Open notepad and write a python script"</button>
@@ -672,12 +873,19 @@ function appendTerminal(data) {
 // Settings UI populating
 function updateSettingsUI(settings) {
   currentConfig = settings;
+  if (window.updateSettingsSubpanels) {
+    try {
+      window.updateSettingsSubpanels(settings);
+    } catch (e) {
+      console.error('Error in updateSettingsSubpanels:', e);
+    }
+  }
 
-  settingUrl.value = settings.lmStudioUrl;
-  settingModel.value = settings.modelName;
-  settingTemp.value = settings.temperature;
-  settingSteps.value = settings.maxSteps;
-  settingPrompt.value = settings.systemPrompt;
+  if (settingUrl && settings.lmStudioUrl) settingUrl.value = settings.lmStudioUrl;
+  if (settingModel && settings.modelName) settingModel.value = settings.modelName;
+  if (settingTemp && settings.temperature !== undefined) settingTemp.value = settings.temperature;
+  if (settingSteps && settings.maxSteps !== undefined) settingSteps.value = settings.maxSteps;
+  if (settingPrompt && settings.systemPrompt !== undefined) settingPrompt.value = settings.systemPrompt;
 
   if (settings.apiFallbacks) {
     const apiOpenAi = document.getElementById('setting-api-openai');
@@ -978,76 +1186,65 @@ if (btnInterrupt) {
 }
 
 // Update Directory
-cwdBtn.onclick = () => {
-  const pathVal = cwdInput.value.trim();
-  if (pathVal) {
-    ws.send(JSON.stringify({
-      type: 'update_cwd',
-      cwd: pathVal
-    }));
-    cwdInput.value = '';
-  }
-};
-
-// Save Settings Event
-saveSettingsBtn.onclick = () => {
-  const swarmMode = document.getElementById('setting-swarm').checked;
-  const autoApprove = {
-    read_file: document.getElementById('approve-read_file').checked,
-    write_file: document.getElementById('approve-write_file').checked,
-    list_directory: document.getElementById('approve-list_directory').checked,
-    web_search: document.getElementById('approve-web_search').checked,
-    view_website: document.getElementById('approve-view_website').checked,
-    open_application: document.getElementById('approve-open_application').checked
-  };
-
-  let rawUrl = settingUrl.value.trim().replace(/\/+$/, '');
-  if (!rawUrl.toLowerCase().endsWith('/v1')) {
-    rawUrl += '/v1';
-  }
-  rawUrl = rawUrl.replace(/:\/\/localhost/i, '://127.0.0.1');
-
-  const newConfig = {
-    lmStudioUrl: rawUrl,
-    modelName: settingModel.value.trim(),
-    temperature: parseFloat(settingTemp.value),
-    maxSteps: parseInt(settingSteps.value),
-    systemPrompt: settingPrompt.value.trim(),
-    swarmMode: swarmMode,
-    autoApprove: autoApprove,
-    lpmMode: document.getElementById('setting-lpm').checked,
-    lpmOmMode: document.getElementById('setting-lpm-om').checked,
-    lpmBatchSize: parseInt(document.getElementById('setting-lpm-batch').value) || 1,
-    apiFallbacks: {
-      openai: (document.getElementById('setting-api-openai') || {}).value || '',
-      anthropic: (document.getElementById('setting-api-anthropic') || {}).value || '',
-      gemini: (document.getElementById('setting-api-gemini') || {}).value || '',
-      groq: (document.getElementById('setting-api-groq') || {}).value || '',
-      priority: ['openai', 'anthropic', 'gemini', 'groq']
+if (cwdBtn && cwdInput) {
+  cwdBtn.onclick = () => {
+    const pathVal = cwdInput.value.trim();
+    if (pathVal) {
+      ws.send(JSON.stringify({
+        type: 'update_cwd',
+        cwd: pathVal
+      }));
+      cwdInput.value = '';
     }
   };
+}
 
-  ws.send(JSON.stringify({
-    type: 'update_settings',
-    settings: newConfig
-  }));
-  showToast('Settings saved & applied successfully!', 'success');
-};
+// Save Settings Event
+if (saveSettingsBtn) {
+  saveSettingsBtn.onclick = () => {
+    const swarmCheckbox = document.getElementById('setting-swarm');
+    const swarmMode = swarmCheckbox ? swarmCheckbox.checked : false;
+    const autoApprove = {
+      read_file: (document.getElementById('approve-read_file') || {}).checked,
+      write_file: (document.getElementById('approve-write_file') || {}).checked,
+      list_directory: (document.getElementById('approve-list_directory') || {}).checked,
+      web_search: (document.getElementById('approve-web_search') || {}).checked,
+      view_website: (document.getElementById('approve-view_website') || {}).checked,
+      open_application: (document.getElementById('approve-open_application') || {}).checked
+    };
 
-// Add banned command item
-addBannedBtn.onclick = () => {
-  const newBanned = newBannedInput.value.trim();
-  if (newBanned && !currentConfig.bannedCommands.includes(newBanned)) {
-    currentConfig.bannedCommands.push(newBanned);
+    let rawUrl = (settingUrl ? settingUrl.value : '').trim().replace(/\/+$/, '');
+    if (!rawUrl.toLowerCase().endsWith('/v1')) {
+      rawUrl += '/v1';
+    }
+    rawUrl = rawUrl.replace(/:\/\/localhost/i, '://127.0.0.1');
+
+    const newConfig = {
+      lmStudioUrl: rawUrl,
+      modelName: settingModel ? settingModel.value.trim() : '',
+      temperature: parseFloat(settingTemp ? settingTemp.value : '0.2'),
+      maxSteps: parseInt(settingSteps ? settingSteps.value : '15'),
+      systemPrompt: settingPrompt ? settingPrompt.value.trim() : '',
+      swarmMode: swarmMode,
+      autoApprove: autoApprove,
+      lpmMode: (document.getElementById('setting-lpm') || {}).checked,
+      lpmOmMode: (document.getElementById('setting-lpm-om') || {}).checked,
+      lpmBatchSize: parseInt((document.getElementById('setting-lpm-batch') || {}).value) || 1,
+      apiFallbacks: {
+        openai: (document.getElementById('setting-api-openai') || {}).value || '',
+        anthropic: (document.getElementById('setting-api-anthropic') || {}).value || '',
+        gemini: (document.getElementById('setting-api-gemini') || {}).value || '',
+        groq: (document.getElementById('setting-api-groq') || {}).value || '',
+        priority: ['openai', 'anthropic', 'gemini', 'groq']
+      }
+    };
+
     ws.send(JSON.stringify({
       type: 'update_settings',
-      settings: { bannedCommands: currentConfig.bannedCommands }
+      settings: newConfig
     }));
-    newBannedInput.value = '';
-    blockedActionsCount++;
-    statBlocks.textContent = blockedActionsCount;
-  }
-};
+  };
+}
 
 // Manual mode switcher dropdown listener
 const modeSelect = document.getElementById('ui-mode-select');
@@ -1331,8 +1528,16 @@ if (btnClearAllMemories) {
   };
 }
 
-// Start app
-initWebSocket();
+// Start app (waits for initial setup if needed)
+if (window.setupPromise) {
+  window.setupPromise.then((status) => {
+    if (status && status.isSetupCompleted) {
+      initWebSocket();
+    }
+  });
+} else {
+  initWebSocket();
+}
 
 
 // --- MODE MENU & MENTION SYSTEM ---
@@ -1700,6 +1905,56 @@ function bindAgentRunnerToggles() {
 }
 bindAgentRunnerToggles();
 
+// -----------------------------------------------------------------------
+// HPM (High Parameter Mode) Sidebar Toggle
+// -----------------------------------------------------------------------
+function _applyHpmSidebarState(active) {
+  const card = document.getElementById('hpm-toggle-card');
+  const sublabel = document.getElementById('hpm-sublabel');
+  if (card) {
+    if (active) {
+      card.classList.add('hpm-active');
+    } else {
+      card.classList.remove('hpm-active');
+    }
+  }
+  if (sublabel) {
+    sublabel.textContent = active ? '\u26a1 AKTİF \u2014 LPM/OM bypass' : '30B+ modeller için';
+  }
+}
+// Expose globally so settings.js can call it
+window._applyHpmSidebarState = _applyHpmSidebarState;
+
+document.addEventListener('DOMContentLoaded', () => {
+  const hpmChk = document.getElementById('hpm-toggle-checkbox');
+  if (hpmChk) {
+    hpmChk.addEventListener('change', () => {
+      const isActive = hpmChk.checked;
+      _applyHpmSidebarState(isActive);
+
+      // Sync Settings panel HPM checkbox
+      const settingHpmEl = document.getElementById('setting-hpm');
+      if (settingHpmEl) settingHpmEl.checked = isActive;
+
+      // Send to backend
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'update_settings',
+          settings: { hpmMode: isActive }
+        }));
+        if (typeof showToast === 'function') {
+          showToast(
+            isActive
+              ? '\u26a1 High Parameter Mode AKTİF \u2014 LPM/OM bypass etkin'
+              : 'High Parameter Mode kapatıldı \u2014 standart algoritma aktif',
+            isActive ? 'warning' : 'info'
+          );
+        }
+      }
+    });
+  }
+});
+
 // --- Frontend Telemetry & Logging ---
 function sendClientLog(data) {
   if (ws && ws.readyState === WebSocket.OPEN) {
@@ -1719,6 +1974,142 @@ window.addEventListener('error', (e) => {
   sendClientLog(`Frontend Error: ${e.message} at ${e.filename}:${e.lineno}`);
 });
 
+
 window.addEventListener('unhandledrejection', (e) => {
   sendClientLog(`Frontend Unhandled Rejection: ${e.reason}`);
 });
+
+// ═══════════════════════════════════════════════════════════════════
+//  TASK LIVE PANEL (TLP) — Real-time agent step tracker
+// ═══════════════════════════════════════════════════════════════════
+
+const TOOL_EMOJI = {
+  execute_command:    '⚡',
+  web_search:        '🔍',
+  view_website:      '🌐',
+  deep_web_search:   '🌐',
+  read_file:         '📄',
+  write_file:        '✍️',
+  list_directory:    '📁',
+  take_screenshot:   '📸',
+  download_image:    '🖼️',
+  library_mode:      '📚',
+  task_plan:         '📋',
+  task_complete:     '✅',
+  send_discord_message: '💬',
+  open_application:  '🚀',
+  read_pdf:          '📕',
+  filter_output:     '🔎',
+  line_checker:      '🔎',
+  url_image_reader:  '🖼️',
+  extract_chart_data:'📊',
+  select_guide:      '📖',
+  generate_workspace_rules: '⚙️'
+};
+
+function clearTaskLivePanel() {
+  const panel = document.getElementById('task-live-panel');
+  const steps = document.getElementById('tlp-steps');
+  const counter = document.getElementById('tlp-counter');
+  if (steps) steps.innerHTML = '';
+  if (counter) counter.textContent = '0 adım';
+  if (panel) panel.classList.add('hidden');
+  window._tlpStepCount = 0;
+}
+
+function handleTaskStep(step) {
+  const panel = document.getElementById('task-live-panel');
+  const stepsContainer = document.getElementById('tlp-steps');
+  const counter = document.getElementById('tlp-counter');
+  if (!panel || !stepsContainer) return;
+
+  // Show panel
+  panel.classList.remove('hidden');
+
+  // Find existing row or create new one
+  let row = document.getElementById('tlp-step-' + step.id);
+  if (!row) {
+    row = document.createElement('div');
+    row.id = 'tlp-step-' + step.id;
+    row.className = 'tlp-step running';
+
+    const icon   = document.createElement('div'); icon.className = 'tlp-step-icon';
+    const num    = document.createElement('span'); num.className = 'tlp-step-num'; num.textContent = step.index;
+    const tool   = document.createElement('span'); tool.className = 'tlp-step-tool';
+    const label  = document.createElement('span'); label.className = 'tlp-step-label';
+    const dur    = document.createElement('span'); dur.className = 'tlp-step-dur'; dur.textContent = '…';
+
+    const emoji = TOOL_EMOJI[step.tool] || '🔧';
+    tool.textContent = emoji + ' ' + (step.tool || '');
+    label.textContent = step.label || step.tool || '';
+    if (step.thought) row.setAttribute('data-thought', step.thought);
+
+    row.appendChild(icon);
+    row.appendChild(num);
+    row.appendChild(tool);
+    row.appendChild(label);
+    row.appendChild(dur);
+    stepsContainer.appendChild(row);
+
+    // Update counter
+    window._tlpStepCount = (window._tlpStepCount || 0) + 1;
+    if (counter) counter.textContent = window._tlpStepCount + ' adım';
+
+    // Auto-scroll to bottom
+    const body = document.getElementById('tlp-body');
+    if (body) body.scrollTop = body.scrollHeight;
+  }
+
+  // Update status class
+  row.className = 'tlp-step ' + (step.status || 'running');
+
+  // Update duration
+  const dur = row.querySelector('.tlp-step-dur');
+  if (dur) {
+    if (step.durationMs != null) {
+      dur.textContent = step.durationMs < 1000
+        ? step.durationMs + 'ms'
+        : (step.durationMs / 1000).toFixed(1) + 's';
+    } else {
+      dur.textContent = '…';
+    }
+  }
+}
+
+// Collapse/expand toggle
+document.addEventListener('DOMContentLoaded', () => {
+  const colBtn = document.getElementById('tlp-collapse-btn');
+  const body   = document.getElementById('tlp-body');
+  if (colBtn && body) {
+    colBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      body.classList.toggle('collapsed');
+      colBtn.classList.toggle('collapsed');
+    });
+  }
+});
+
+// Hook into updateUIState to show/hide panel based on agent status
+const _origUpdateUIState = window.updateUIState;
+if (typeof _origUpdateUIState === 'function') {
+  // patched after definition — see below
+}
+
+// Patch updateUIState to also control panel visibility
+// We do this by wrapping it after the original definition runs.
+window._tlpPatchApplied = false;
+function _patchTLPOnUIState() {
+  if (window._tlpPatchApplied) return;
+  if (typeof window.updateUIState !== 'function') return;
+  window._tlpPatchApplied = true;
+  const orig = window.updateUIState;
+  window.updateUIState = function(state) {
+    orig.call(this, state);
+    // If agent is idle/completed/failed and panel has steps, keep it visible (show history)
+    // If agent just became active, panel will show via handleTaskStep
+  };
+}
+// Try to patch once DOM is ready
+document.addEventListener('DOMContentLoaded', _patchTLPOnUIState);
+setTimeout(_patchTLPOnUIState, 500);
+// ═══════════════════════════════════════════════════════════════════

@@ -5,12 +5,143 @@
     ],
     "connectionSpeedLimit": 0.7,
     "founderKey": "CHANGE_THIS_TO_A_SECURE_SECRET",
-    "lpmMode": true,
-    "lpmBatchSize": 4,
-    "lpmOmMode": true,
+    "lpmMode": false,
+    "lpmBatchSize": 1,
+    "lpmOmMode": false,
     "forceTaskPlan": false,
     "simbaEnabled": true,
     "sgmMode": true,
-    "esYabanciMode": true
+    "esYabanciMode": true,
+    "apiFallbacks": {
+      "openai": "",
+      "anthropic": "",
+      "gemini": "",
+      "groq": "",
+      "priority": [
+        "openai",
+        "anthropic",
+        "gemini",
+        "groq"
+      ]
+    },
+    "modelTags": {
+      "qwen2.5-3b-instruct": [
+        "hizli"
+      ],
+      "qwen2.5-coder-14b-instruct": [
+        "orta"
+      ],
+      "mistralai/devstral-small-2-2512": [
+        "yuklu"
+      ],
+      "qwen2.5-coder-7b-instruct": [
+        "hizli"
+      ],
+      "google/gemma-4-26b-a4b-qat": [
+        "yuklu"
+      ]
+    },
+    "toolModelConfig": {
+      "library_mode": {
+        "tag": "hizli",
+        "fallbackTag": "orta"
+      },
+      "web_search": {
+        "tag": "orta",
+        "fallbackTag": "hizli"
+      },
+      "view_website": {
+        "tag": "orta",
+        "fallbackTag": "hizli"
+      },
+      "deep_web_search": {
+        "tag": "orta",
+        "fallbackTag": "yuklu"
+      },
+      "execute_command": {
+        "tag": "hizli",
+        "fallbackTag": "orta"
+      },
+      "write_file": {
+        "tag": "yuklu",
+        "fallbackTag": "yuklu"
+      },
+      "read_file": {
+        "tag": "hizli",
+        "fallbackTag": "orta"
+      },
+      "list_directory": {
+        "tag": "hizli",
+        "fallbackTag": "orta"
+      },
+      "url_image_reader": {
+        "tag": "yuklu",
+        "fallbackTag": "yuklu"
+      },
+      "extract_chart_data": {
+        "tag": "yuklu",
+        "fallbackTag": "yuklu"
+      },
+      "take_screenshot": {
+        "tag": "orta",
+        "fallbackTag": "yuklu"
+      },
+      "__default__": {
+        "tag": "orta",
+        "fallbackTag": "yuklu"
+      }
+    },
+    "adaptiveRouting": true,
+    "modelSwitchingEnabled": true,
+    "modelLadder": [
+      "google/gemma-4-26b-a4b-qat",
+      "mistralai/devstral-small-2-2512",
+      "qwen2.5-coder-14b-instruct",
+      "qwen2.5-coder-7b-instruct",
+      "qwen2.5-3b-instruct"
+    ],
+    "modelModeProfiles": {
+      "qwen2.5-3b-instruct": {
+        "lpmMode": true,
+        "lpmOmMode": true,
+        "hpmMode": false,
+        "advancedReasoningMode": true,
+        "forceTaskPlan": false,
+        "simbaEnabled": true
+      },
+      "qwen2.5-coder-14b-instruct": {
+        "lpmMode": true,
+        "lpmOmMode": true,
+        "advancedReasoningMode": true,
+        "forceTaskPlan": true,
+        "simbaEnabled": true
+      },
+      "mistralai/devstral-small-2-2512": {
+        "lpmMode": true,
+        "lpmOmMode": false
+      },
+      "qwen2.5-coder-7b-instruct": {
+        "lpmMode": true,
+        "lpmOmMode": true,
+        "simbaEnabled": true,
+        "forceTaskPlan": true,
+        "advancedReasoningMode": true
+      }
+    },
+    "temperature": 0.35,
+    "maxSteps": 45,
+    "autoApprove": {
+      "read_file": true,
+      "write_file": true,
+      "list_directory": true,
+      "web_search": true,
+      "view_website": false,
+      "open_application": false,
+      "send_discord_message": true,
+      "line_checker": true,
+      "url_image_reader": false,
+      "library_mode": true,
+      "notify_user": true
+    }
   }
 ]

@@ -11,19 +11,8 @@ const {
  * Generates custom mode rules for the IDE Planner Agent based on active mode & sub-mode
  */
 function getPlannerModeRules(state) {
-  let modeRules = '';
-  if (state.activeMode === 'research') {
-    if (state.activeSubMode === 'web') {
-      modeRules = `\n\n[DİKKAT: Ajan şu an 'Web Research' modundadır. Planını buna göre yap. Adımların web araması yapmak ve siteleri okumak olmalı. SON ADIMIN (örneğin 4. veya 5. adım) SADECE "Topladığın bilgileri kullanıcıya raporla" cümlesinden ibaret olmalıdır. SAKIN BURADA RAPORU VEYA SONUCU YAZMA! Sen sadece bir yapılacaklar listesi (plan) hazırlıyorsun, araştırmayı sen yapmayacaksın.]`;
-    } else if (state.activeSubMode === 'local') {
-      modeRules = `\n\n[DİKKAT: Ajan şu an 'Local Research' modundadır. SADECE yerel dosyaları okuyabilir. İnternete bağlanamaz. SON ADIMIN SADECE "Bulduğun yerel sonuçları kullanıcıya raporla" cümlesi olmalıdır. SAKIN BURADA SONUÇLARI YAZMA! Sadece plan oluşturuyorsun.]`;
-    } else if (state.activeSubMode === 'deep_web') {
-      modeRules = `\n\n[DİKKAT: Ajan şu an 'Deep Web Research' modundadır. Planını çok kısa tut ve SON ADIM olarak SADECE "Detaylı raporlama yap" maddesini ekle. SAKIN RAPORU BURADA YAZMA.]`;
-    }
-  } else if (state.activeMode === 'manuel') {
-    modeRules = `\n\n[DİKKAT: Ajan şu an 'Manuel Tool' modundadır. Planını en fazla 2-3 adımda bitir ve SON ADIM olarak SADECE "Sonucu kullanıcıya raporla" de. SAKIN BURADA RAPOR VEYA ÇÖZÜM ÜRETMEYE ÇALIŞMA, sadece adımları yaz.]`;
-  }
-  return modeRules;
+  // Research and Library modes run their own direct workflows and bypass IDE Planner completely.
+  return '';
 }
 
 /**

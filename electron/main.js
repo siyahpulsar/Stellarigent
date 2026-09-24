@@ -4,6 +4,21 @@ const fs = require('fs');
 const http = require('http');
 const { spawn } = require('child_process');
 
+// .env dosyasından PORT oku — sunucuyla tutarlı olması için
+const dotenvPath = path.join(__dirname, '..', '.env');
+let AGENT_PORT = 3000;
+try {
+  if (fs.existsSync(dotenvPath)) {
+    const envLines = fs.readFileSync(dotenvPath, 'utf-8').split('\n');
+    for (const line of envLines) {
+      const match = line.match(/^PORT\s*=\s*(\d+)/);
+      if (match) { AGENT_PORT = parseInt(match[1], 10); break; }
+    }
+  }
+} catch (e) {
+  console.warn('[main.js] .env okunurken hata:', e.message);
+}
+
 let mainWindow;
 let serverProcess = null;
 
@@ -18,9 +33,9 @@ function checkServer(port, callback) {
 }
 
 function startServer(callback) {
-  checkServer(3000, (isRunning) => {
+  checkServer(AGENT_PORT, (isRunning) => {
     if (isRunning) {
-      console.log('Server is already running on port 3000');
+      console.log(`Server is already running on port ${AGENT_PORT}`);
       callback();
     } else {
       console.log('Starting server.js...');
@@ -32,13 +47,13 @@ function startServer(callback) {
       // Poll until server is ready (max 30s, every 500ms)
       let attempts = 0;
       const poll = () => {
-        checkServer(3000, (ready) => {
+        checkServer(AGENT_PORT, (ready) => {
           if (ready) {
             callback();
           } else if (attempts++ < 60) {
             setTimeout(poll, 500);
           } else {
-            console.error('Server did not start within 30 seconds.');
+            console.error(`Server did not start within 30 seconds on port ${AGENT_PORT}.`);
             callback(); // proceed anyway, window will show error
           }
         });
@@ -60,7 +75,10 @@ function createWindow() {
     }
   });
 
-  mainWindow.loadFile(path.join(__dirname, 'index.html'));
+  // index.html'i yükleme: port bilgisini query param olarak geçiriyoruz.
+  // ide.js bu parametreyi window.AGENT_PORT olarak okuyacak.
+  const indexPath = path.join(__dirname, 'index.html');
+  mainWindow.loadURL(`file://${indexPath}?agentPort=${AGENT_PORT}`);
 
   // Simple menu: File, Edit, Help
   const menuTemplate = [
@@ -101,8 +119,8 @@ function createWindow() {
           click: () => {
             dialog.showMessageBox({
               type: 'info',
-              title: 'About Local AI Agent IDE',
-              message: 'Local AI Agent Desktop IDE\nVersion 1.0.0'
+              title: 'About Stellarigent IDE',
+              message: 'Stellarigent Desktop IDE\nVersion 1.0.0'
             });
           }
         }

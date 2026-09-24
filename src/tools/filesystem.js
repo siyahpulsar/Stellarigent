@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { agentState, broadcastTerminal } = require('../state');
-const { checkAndRegisterPath } = require('../security');
+const { checkAndRegisterPath, isProtectedProjectFile, checkTripwire } = require('../security');
 
 function getSandboxPath(actualPath) {
   const relativeToCwd = path.relative(agentState.cwd, actualPath);
@@ -12,14 +12,20 @@ function getSandboxPath(actualPath) {
 }
 
 async function readLocalFile(filePath) {
+  // 1. Tripwire check
+  const tripwireStatus = checkTripwire(filePath);
+  if (tripwireStatus.tripwireTriggered) {
+    return { success: false, tripwireTriggered: true, message: tripwireStatus.message };
+  }
+
+  if (!filePath || isProtectedProjectFile(filePath) || !checkAndRegisterPath(filePath, false)) {
+    broadcastTerminal(`> [SECURITY BLOCKED] Proje çekirdek dosyasına veya izinsiz yola erişim engellendi: ${filePath}\n`);
+    return { success: false, message: "GÜVENLİK İHLALİ: Proje çekirdek dosyalarına ve kaynak kodlarına erişim kesinlikle engellenmiştir." };
+  }
+
   const targetPath = path.resolve(agentState.cwd, filePath);
   const sandboxPath = getSandboxPath(targetPath);
   broadcastTerminal(`> [FILE READ] Checking Sandbox: ${sandboxPath} -> Real: ${targetPath}\n`);
-  
-  if (!checkAndRegisterPath(filePath, false)) {
-    broadcastTerminal(`> [BLOCKED] Access to path is restricted: ${filePath}\n`);
-    return { success: false, message: "Dosya erişimi güvenlik politikası nedeniyle engellendi." };
-  }
   
   try {
     let finalPathToRead = targetPath;
@@ -36,14 +42,14 @@ async function readLocalFile(filePath) {
 }
 
 async function writeLocalFile(filePath, content) {
+  if (!filePath || isProtectedProjectFile(filePath) || !checkAndRegisterPath(filePath, true)) {
+    broadcastTerminal(`> [SECURITY BLOCKED] Proje çekirdek dosyasına veya sistem alanına yazma engellendi: ${filePath}\n`);
+    return { success: false, message: "GÜVENLİK İHLALİ: Proje çekirdek dosyalarına yazma veya değiştirme işlemi kesinlikle engellenmiştir." };
+  }
+
   const targetPath = path.resolve(agentState.cwd, filePath);
   const sandboxPath = getSandboxPath(targetPath);
   broadcastTerminal(`> [FILE WRITE] Sandbox: ${sandboxPath} (Real: ${targetPath})\n`);
-  
-  if (!checkAndRegisterPath(filePath, true)) {
-    broadcastTerminal(`> [BLOCKED] Access to path is restricted: ${filePath}\n`);
-    return { success: false, message: "Dosya erişimi güvenlik politikası nedeniyle engellendi." };
-  }
   
   try {
     const ext = path.extname(sandboxPath);
@@ -68,6 +74,11 @@ async function writeLocalFile(filePath, content) {
 }
 
 async function listLocalDirectory(dirPath) {
+  if (dirPath && isProtectedProjectFile(dirPath)) {
+    broadcastTerminal(`> [SECURITY BLOCKED] Proje çekirdek dizinini listeleme engellendi: ${dirPath}\n`);
+    return { success: false, message: "GÜVENLİK İHLALİ: Bu dizini listeleme izniniz yok." };
+  }
+
   const targetPath = path.resolve(agentState.cwd, dirPath || '.');
   broadcastTerminal(`> [DIRECTORY LIST] ${targetPath}\n`);
   
@@ -81,7 +92,13 @@ async function listLocalDirectory(dirPath) {
       return { success: false, message: `Directory does not exist: ${dirPath}` };
     }
     const items = await fs.promises.readdir(targetPath);
-    const details = await Promise.all(items.map(async name => {
+    const isRoot = path.resolve(targetPath) === path.resolve(agentState.cwd);
+    
+    const details = (await Promise.all(items.map(async name => {
+      // Do not expose protected project core files/folders in root listing
+      if (isRoot && isProtectedProjectFile(name)) {
+        return null;
+      }
       const itemPath = path.join(targetPath, name);
       try {
         const stats = await fs.promises.stat(itemPath);
@@ -93,7 +110,8 @@ async function listLocalDirectory(dirPath) {
       } catch (err) {
         return { name, type: 'unknown', size: 0 };
       }
-    }));
+    }))).filter(Boolean);
+    
     return { success: true, items: details };
   } catch (error) {
     return { success: false, message: error.message };

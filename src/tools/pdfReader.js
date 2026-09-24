@@ -1,7 +1,17 @@
 const fs = require('fs');
 const pdfParse = require('pdf-parse');
+const { checkAndRegisterPath, isProtectedProjectFile, checkTripwire } = require('../security');
 
 async function readPdf(filePath) {
+  const tripwireStatus = checkTripwire(filePath);
+  if (tripwireStatus.tripwireTriggered) {
+    return { success: false, tripwireTriggered: true, message: tripwireStatus.message };
+  }
+
+  if (!filePath || isProtectedProjectFile(filePath) || !checkAndRegisterPath(filePath, false)) {
+    return { success: false, message: "GÜVENLİK İHLALİ: PDF dosyasına erişim güvenlik politikası nedeniyle engellendi." };
+  }
+
   try {
     if (!fs.existsSync(filePath)) {
       return { success: false, message: `PDF file not found at path: ${filePath}` };

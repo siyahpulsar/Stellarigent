@@ -6,9 +6,15 @@ const { agentState, broadcastTerminal, getLmStudioEndpoint } = require('../state
 const { getSandboxPath } = require('./filesystem');
 const { extractUrlsFromText } = require('./filters');
 const { llmFetch } = require('../llm/llmClient');
+const { checkAndRegisterPath, isProtectedProjectFile } = require('../security');
 
 // Downloads an image from a URL and saves it to the local workspace sandbox
 async function downloadImage(url, destPath) {
+  if (!destPath || isProtectedProjectFile(destPath) || !checkAndRegisterPath(destPath, true)) {
+    broadcastTerminal(`> [SECURITY BLOCKED] Görsel indirme hedefi korumalı veya geçersiz: ${destPath}\n`);
+    return { success: false, message: "GÜVENLİK İHLALİ: Proje çekirdek konumlarına veya izinsiz yollara görsel indirilemez." };
+  }
+
   const targetPath = path.resolve(agentState.cwd, destPath);
   const sandboxPath = getSandboxPath(targetPath);
   broadcastTerminal(`\n> [DOWNLOAD IMAGE] URL: ${url} -> Sandbox Path: ${sandboxPath}\n`);
@@ -185,6 +191,10 @@ async function urlImageReader(selection, count, question) {
 async function extractChartData(imagePath) {
   broadcastTerminal(`\n> [CHART EXTRACTION] Analyzing image: ${imagePath}\n`);
   
+  if (!imagePath || isProtectedProjectFile(imagePath) || !checkAndRegisterPath(imagePath, false)) {
+    return { success: false, message: `GÜVENLİK İHLALİ: Görsel yolu korumalı veya erişilemez: ${imagePath}` };
+  }
+
   const absolutePath = path.resolve(agentState.cwd, imagePath);
   if (!fs.existsSync(absolutePath)) {
     return { success: false, message: `Görsel bulunamadı: ${absolutePath}` };
@@ -199,11 +209,15 @@ async function extractChartData(imagePath) {
   try {
     const base64Data = await fs.promises.readFile(absolutePath, 'base64');
     
+    const { config } = require('../state');
+    const defaultChartPrompt = 'Sen bir finansal veri çıkarıcı yapay zekasın. Gönderdiğim grafik görselini (çizgi veya mum grafiği) analiz et ve grafikteki veri noktalarını sırasıyla sadece düz bir JSON sayı dizisi olarak çıkar (örneğin: [1, 6, 2, 5, 7, 13, 265, ...]). Sayılar 1 ile 1000 arasında orantılanmış olmalıdır. Sadece JSON dizisini yaz, markdown block kullanabilirsin, başka hiçbir açıklama yapma.';
+    const chartPrompt = (config && config.systemPrompts && config.systemPrompts.chart_data_extractor) || defaultChartPrompt;
+
     const messages = [
       {
         role: 'user',
         content: [
-          { type: 'text', text: 'Sen bir finansal veri çıkarıcı yapay zekasın. Gönderdiğim grafik görselini (çizgi veya mum grafiği) analiz et ve grafikteki veri noktalarını sırasıyla sadece düz bir JSON sayı dizisi olarak çıkar (örneğin: [1, 6, 2, 5, 7, 13, 265, ...]). Sayılar 1 ile 1000 arasında orantılanmış olmalıdır. Sadece JSON dizisini yaz, markdown block kullanabilirsin, başka hiçbir açıklama yapma.' },
+          { type: 'text', text: chartPrompt },
           { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Data}` } }
         ]
       }
@@ -225,7 +239,11 @@ async function extractChartData(imagePath) {
       return { success: false, message: "LLM cevabında dizi formatı bulunamadı.", raw_output: result };
     }
 
-    const savePath = path.join(agentState.cwd, `extracted_chart_${Date.now()}.json`);
+    const scratchDir = path.join(agentState.cwd, 'scratch');
+    if (!fs.existsSync(scratchDir)) {
+      try { await fs.promises.mkdir(scratchDir, { recursive: true }); } catch (e) {}
+    }
+    const savePath = path.join(scratchDir, `extracted_chart_${Date.now()}.json`);
     await fs.promises.writeFile(savePath, JSON.stringify(extractedArray, null, 2));
     
     broadcastTerminal(`> [CHART EXTRACTION] Data extracted and saved to: ${savePath}\n`);

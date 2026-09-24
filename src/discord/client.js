@@ -53,7 +53,7 @@ function initDiscordBot(wsBroadcast, serverCallbacks = null) {
   state.client.once('clientReady', () => {
     state.discordState.online = true;
     if (state.broadcastCallback) state.broadcastCallback();
-    state.client.user.setActivity('Stellarch music', { type: ActivityType.Listening });
+    state.client.user.setActivity('Stellarigent music', { type: ActivityType.Listening });
   });
 
   state.client.on('interactionCreate', async (interaction) => {
@@ -76,6 +76,30 @@ function initDiscordBot(wsBroadcast, serverCallbacks = null) {
       } else {
         await interaction.reply({ content: "❌ Bekleyen aktif bir işlem bulunamadı.", ephemeral: true });
       }
+    } else if (interaction.customId.startsWith('approve_rule_') || interaction.customId.startsWith('reject_rule_')) {
+      if (interaction.user.id !== state.founderDiscordId) {
+        await interaction.reply({ content: "❌ Bu kuralı sadece Kurucu onaylayabilir!", ephemeral: true });
+        return;
+      }
+      const isApprove = interaction.customId.startsWith('approve_rule_');
+      const ruleId = interaction.customId.replace(/^(approve_rule_|reject_rule_)/, '');
+      const { approvePendingRule, rejectPendingRule } = require('../memory');
+      const res = isApprove ? await approvePendingRule(ruleId) : await rejectPendingRule(ruleId);
+
+      if (!res) {
+        const embed = EmbedBuilder.from(interaction.message.embeds[0])
+          .setColor(0x64748b)
+          .setTitle("ℹ️ Kural Zaten İşlendi")
+          .setDescription("Bu güvenlik kuralı daha önce Web Paneli veya Discord üzerinden zaten onaylanmış veya silinmiş.");
+        await interaction.update({ embeds: [embed], components: [] });
+        return;
+      }
+
+      const embed = EmbedBuilder.from(interaction.message.embeds[0])
+        .setColor(isApprove ? 0x10b981 : 0xef4444)
+        .setTitle(isApprove ? "✅ Güvenlik Kuralı Onaylandı" : "❌ Güvenlik Kuralı Silindi")
+        .setDescription(`Bu kural Discord üzerinden kurucu tarafından ${isApprove ? "ONAYLANDI (Aktif belleğe eklendi)" : "REDDEDİLDİ (Silindi)"}.`);
+      await interaction.update({ embeds: [embed], components: [] });
     }
   });
 

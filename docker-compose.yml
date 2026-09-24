@@ -10,6 +10,7 @@ services:
       # Persist config and libraries
       - ./config:/app/config
       - ./Libraries:/app/Libraries
+      - ./byAI:/app/byAI
       - ./.env:/app/.env
     environment:
       - NODE_ENV=production
