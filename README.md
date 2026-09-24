@@ -1,6 +1,24 @@
 # 🤖 Stellarigent (Autonomous Local AI Agent Framework)
 
+[![Node.js](https://img.shields.io/badge/Node.js-v18+-green.svg)](https://nodejs.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![LLM](https://img.shields.io/badge/LLM-LM%20Studio%20Local-orange.svg)](https://lmstudio.ai/)
+[![Discord](https://img.shields.io/badge/Discord-v14-5865F2.svg)](https://discord.js.org/)
+
 > **100% Local, Autonomous AI Computer Agent with Real-Time Web Dashboard, Electron Desktop IDE, Discord Bot, Puppeteer Web Automation, Multi-Agent Swarm Mode, Model Routing & Failover Ladder.**
+
+> [!WARNING]
+> ### ⚠️ ÖNEMLİ BİLGİLENDİRME VE RİSK UYARISI
+> Bu projenin kodu büyük oranda **Gemini (Yapay Zeka)** tarafından yazılmış olup; algoritma, çalışma mantığı, mimari kararlar ve uygulamanın tüm fikir hakları proje geliştiricisi **siyahpulsar**'a aittir. Gemini sadece bu düşünceleri koda dökerek gerçek hayata geçirmiştir. **Gemini sadece kod yazma ve kod doğrulama/düzeltme/analiz etme toolu olarak rol oynamıştır.** Proje geliştiricisi tüm özellikleri bizzat deneyememiş olup, tam güvenlik ve %100 sorunsuz çalışabilirlik garantisi sunulmamaktadır. Kodların bilgisayarınızda çalıştırılmasından doğabilecek tahmin edilebilir veya edilemez, olası tüm donanımsal, yazılımsal ve güvenlik riskleri tamamen projeyi indirip kullanan **kullanıcının kendi sorumluluğundadır**.
+> 
+> *Olası bir açık, hata, ekstra token harcamaları, tasarrufsuzluk, eksik optimizasyon ve performans sorunları veya yeni fikir ve öneriler için Discord üzerinden **siyahpulsar**'a bildirmeyi unutmayın.*
+> 
+> ---
+> 
+> ### ⚠️ IMPORTANT DISCLAIMER & RISK WARNING
+> *This project's code was largely written by **Gemini (AI)**, but all algorithms, operational logic, architectural decisions, and project ideas belong exclusively to the developer, **siyahpulsar**. Gemini only served to translate these thoughts into code and bring them to life. **Gemini played a role strictly as a tool for code writing, verification, correction, and analysis.** The developer has not tested all features extensively; therefore, full security and flawless functionality are not guaranteed. Any predictable or unpredictable risks—including hardware, software, or security vulnerabilities—arising from executing this project are entirely the **responsibility of the user**.*
+> 
+> *If you encounter vulnerabilities, bugs, unnecessary token consumption, missing optimizations, performance issues, or have new ideas and suggestions, please report them to **siyahpulsar** on Discord.*
 
 ---
 
