@@ -1,4 +1,4 @@
-# 🤖 Stellarigent (Autonomous Local AI Agent Framework)
+# Stellarigent (Autonomous Local AI Agent Framework)
 
 [![Node.js](https://img.shields.io/badge/Node.js-v18+-green.svg)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -8,21 +8,21 @@
 > **100% Local, Autonomous AI Computer Agent with Real-Time Web Dashboard, Electron Desktop IDE, Discord Bot, Puppeteer Web Automation, Multi-Agent Swarm Mode, Model Routing & Failover Ladder.**
 
 > [!WARNING]
-> ### ⚠️ ÖNEMLİ BİLGİLENDİRME VE RİSK UYARISI
+> ### ÖNEMLİ BİLGİLENDİRME VE RİSK UYARISI
 > Bu projenin kodu büyük oranda **Gemini (Yapay Zeka)** tarafından yazılmış olup; algoritma, çalışma mantığı, mimari kararlar ve uygulamanın tüm fikir hakları proje geliştiricisi **siyahpulsar**'a aittir. Gemini sadece bu düşünceleri koda dökerek gerçek hayata geçirmiştir. **Gemini sadece kod yazma ve kod doğrulama/düzeltme/analiz etme toolu olarak rol oynamıştır.** Proje geliştiricisi tüm özellikleri bizzat deneyememiş olup, tam güvenlik ve %100 sorunsuz çalışabilirlik garantisi sunulmamaktadır. Kodların bilgisayarınızda çalıştırılmasından doğabilecek tahmin edilebilir veya edilemez, olası tüm donanımsal, yazılımsal ve güvenlik riskleri tamamen projeyi indirip kullanan **kullanıcının kendi sorumluluğundadır**.
 > 
 > *Olası bir açık, hata, ekstra token harcamaları, tasarrufsuzluk, eksik optimizasyon ve performans sorunları veya yeni fikir ve öneriler için Discord üzerinden **siyahpulsar**'a bildirmeyi unutmayın.*
 > 
 > ---
 > 
-> ### ⚠️ IMPORTANT DISCLAIMER & RISK WARNING
+> ### IMPORTANT DISCLAIMER & RISK WARNING
 > *This project's code was largely written by **Gemini (AI)**, but all algorithms, operational logic, architectural decisions, and project ideas belong exclusively to the developer, **siyahpulsar**. Gemini only served to translate these thoughts into code and bring them to life. **Gemini played a role strictly as a tool for code writing, verification, correction, and analysis.** The developer has not tested all features extensively; therefore, full security and flawless functionality are not guaranteed. Any predictable or unpredictable risks—including hardware, software, or security vulnerabilities—arising from executing this project are entirely the **responsibility of the user**.*
 > 
 > *If you encounter vulnerabilities, bugs, unnecessary token consumption, missing optimizations, performance issues, or have new ideas and suggestions, please report them to **siyahpulsar** on Discord.*
 
 ---
 
-## 📖 Table of Contents / İçindekiler
+## Table of Contents / İçindekiler
 - [English Documentation](#-english-documentation)
   - [1. System Overview & Core Mission](#1-system-overview--core-mission)
   - [2. Comprehensive Feature Matrix](#2-comprehensive-feature-matrix)
@@ -51,7 +51,7 @@
 
 ---
 
-## 🇬🇧 English Documentation
+## English Documentation
 
 ### 1. System Overview & Core Mission
 
@@ -110,11 +110,11 @@ Rather than relying on unverified subjective tier scores, Stellarigent features 
 
 | Suite | Scenarios | Target Subsystem | Status |
 | :--- | :---: | :--- | :---: |
-| **Parser Resilience** | 5 | Markdown codeblocks, raw JSON, XML tags, Qwen `[TOOL_CALLS]`, Heuristic Regex fallback | ✅ **PASS** (5/5) |
-| **Security & Confinement** | 3 | Core shield isolation (`src/**`), Path traversal rejection (`..`), Network egress blocking (`curl`, `irm`) | ✅ **PASS** (3/3) |
-| **Tripwire Lifecycle** | 2 | Exfiltration tripwire arming & halt, Tripwire task reset & recovery | ✅ **PASS** (2/2) |
-| **Cost & Quota Tracking** | 2 | Local 0-cost usage recording, Cloud provider pricing calculation & daily budget tripwire | ✅ **PASS** (2/2) |
-| **Memory Pruning** | 1 | Two-stage mathematical pruning score, 24h grace period protection, 50-item hard quota | ✅ **PASS** (1/1) |
+| **Parser Resilience** | 5 | Markdown codeblocks, raw JSON, XML tags, Qwen `[TOOL_CALLS]`, Heuristic Regex fallback | **PASS** (5/5) |
+| **Security & Confinement** | 3 | Core shield isolation (`src/**`), Path traversal rejection (`..`), Network egress blocking (`curl`, `irm`) | **PASS** (3/3) |
+| **Tripwire Lifecycle** | 2 | Exfiltration tripwire arming & halt, Tripwire task reset & recovery | **PASS** (2/2) |
+| **Cost & Quota Tracking** | 2 | Local 0-cost usage recording, Cloud provider pricing calculation & daily budget tripwire | **PASS** (2/2) |
+| **Memory Pruning** | 1 | Two-stage mathematical pruning score, 24h grace period protection, 50-item hard quota | **PASS** (1/1) |
 | **Overall Score** | **13 Scenarios** | **Full System Integrity Check** | **100.0% Pass Rate** |
 
 To run the evaluation suite locally:
@@ -268,7 +268,7 @@ npm start
 ```
 Access the web dashboard at `http://localhost:3000` or control the entire agent system directly through the **Interactive Terminal CLI**!
 
-#### 💻 Interactive Terminal CLI Controller
+#### Interactive Terminal CLI Controller
 When `npm start` is executed, an interactive command console (`Stellarigent [mode/submode | status]> `) launches simultaneously on standard terminal I/O. Both users and testing scripts can fully control and test the project:
 
 - **Menu & Mode Navigation:**
@@ -311,7 +311,7 @@ docker-compose up --build
 
 ---
 
-## 🇹🇷 Türkçe Dokümantasyon
+## Türkçe Dokümantasyon
 
 ### 1. Sistem Genel Bakışı ve Temel Hedef
 
@@ -370,11 +370,11 @@ docker-compose up --build
 
 | Test Paketi | Senaryo Sayısı | Kapsanan Alt Sistem | Durum |
 | :--- | :---: | :--- | :---: |
-| **Ayrıştırıcı Dayanıklılığı** | 5 | Markdown kod blokları, ham JSON, XML tag'leri, Qwen sözdizimi, Regex geri çekilmesi | ✅ **BAŞARILI** (5/5) |
-| **Güvenlik ve Yalıtım** | 3 | Çekirdek kalkanı (`src/**`), Dizin atlama engeli (`..`), Ağ dışa sızdırma komut yasağı (`curl`, `irm`) | ✅ **BAŞARILI** (3/3) |
-| **Tripwire Yaşam Döngüsü** | 2 | Sızdırma girişiminde acil durdurma ve görev bazlı kilit, Manuel tripwire sıfırlama ve kurtarma | ✅ **BAŞARILI** (2/2) |
-| **Maliyet ve Kota Takibi** | 2 | Yerel modellerde 0$ kullanım kaydı, Bulut sağlayıcı fiyatlandırma hesabı ve günlük bütçe devresi | ✅ **BAŞARILI** (2/2) |
-| **Bellek Kırpma** | 1 | İki aşamalı matematiksel skor, 24 saatlik koruma dönemi, 50 kural kesin kotası | ✅ **BAŞARILI** (1/1) |
+| **Ayrıştırıcı Dayanıklılığı** | 5 | Markdown kod blokları, ham JSON, XML tag'leri, Qwen sözdizimi, Regex geri çekilmesi | **BAŞARILI** (5/5) |
+| **Güvenlik ve Yalıtım** | 3 | Çekirdek kalkanı (`src/**`), Dizin atlama engeli (`..`), Ağ dışa sızdırma komut yasağı (`curl`, `irm`) | **BAŞARILI** (3/3) |
+| **Tripwire Yaşam Döngüsü** | 2 | Sızdırma girişiminde acil durdurma ve görev bazlı kilit, Manuel tripwire sıfırlama ve kurtarma | **BAŞARILI** (2/2) |
+| **Maliyet ve Kota Takibi** | 2 | Yerel modellerde 0$ kullanım kaydı, Bulut sağlayıcı fiyatlandırma hesabı ve günlük bütçe devresi | **BAŞARILI** (2/2) |
+| **Bellek Kırpma** | 1 | İki aşamalı matematiksel skor, 24 saatlik koruma dönemi, 50 kural kesin kotası | **BAŞARILI** (1/1) |
 | **Genel Skor** | **13 Senaryo** | **Bütüncül Sistem Doğrulaması** | **%100.0 Başarı Oranı** |
 
 Test paketini yerel olarak çalıştırmak için:
@@ -528,7 +528,7 @@ npm start
 ```
 Tarayıcınızdan `http://localhost:3000` adresine gidebilir veya sistemi doğrudan konsol üzerinden **İnteraktif Terminal Kontrolcüsü** ile yönetebilirsiniz!
 
-#### 💻 İnteraktif Konsol / Terminal Kontrolcüsü (Terminal CLI)
+#### İnteraktif Konsol / Terminal Kontrolcüsü (Terminal CLI)
 `npm start` çalıştırıldığında arkaplanda Express ve WebSocket çalışırken standart girdi/çıktı üzerinde dinamik bir komut istemcisi (`Stellarigent [mod/alt-mod | durum]> `) devreye girer. Hem geliştirici hem de test otomasyonu sistemi konsoldan bütünüyle kontrol edebilir:
 
 - **Menüler ve Modlar Arası Geçiş:**
@@ -571,6 +571,6 @@ docker-compose up --build
 
 ---
 
-## 📜 License
+## License
 
 This project is open-source software available under the **MIT License**.
