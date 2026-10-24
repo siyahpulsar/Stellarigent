@@ -1,3 +1,5 @@
+(this project not serious. Have a discord entegration, a video downloader and other things. not only about ai and agent. if you want remove some of them, you can.)
+
 # Stellarigent (Autonomous Local AI Agent Framework)
 
 [![Node.js](https://img.shields.io/badge/Node.js-v18+-green.svg)](https://nodejs.org/)
